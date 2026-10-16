@@ -1,6 +1,8 @@
 package com.pay.tracker.core.database
 
 import com.pay.tracker.core.model.Transaction
+import com.pay.tracker.core.model.TransactionClassification
+import com.pay.tracker.core.model.TransactionDirection
 import com.pay.tracker.core.model.TransactionStatus
 
 /**
@@ -17,7 +19,10 @@ fun TransactionEntity.toDomain(): Transaction {
         status = runCatching { TransactionStatus.valueOf(status) }.getOrDefault(TransactionStatus.PENDING),
         rawNotification = rawNotification,
         referenceId = referenceId,
-        fingerprint = fingerprint
+        fingerprint = fingerprint,
+        direction = runCatching { TransactionDirection.valueOf(direction) }.getOrDefault(TransactionDirection.DEBIT),
+        classification = runCatching { TransactionClassification.valueOf(classification) }.getOrDefault(TransactionClassification.EXPENSE),
+        originalExpenseId = originalExpenseId
     )
 }
 
@@ -32,6 +37,9 @@ fun Transaction.toEntity(): TransactionEntity {
         status = status.name,
         rawNotification = rawNotification,
         referenceId = referenceId,
-        fingerprint = fingerprint
+        fingerprint = fingerprint,
+        direction = direction.name,
+        classification = classification.name,
+        originalExpenseId = originalExpenseId
     )
 }

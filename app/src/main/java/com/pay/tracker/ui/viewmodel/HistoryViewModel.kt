@@ -17,9 +17,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 import java.text.SimpleDateFormat
+import com.pay.tracker.core.model.TransactionDirection
+import com.pay.tracker.core.model.TransactionClassification
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+enum class TransactionTypeFilter(val label: String) {
+    ALL("All"),
+    EXPENSES_ONLY("Expenses Only"),
+    INCOME_ONLY("Income Only")
+}
 
 enum class DatePeriodFilter(val label: String) {
     ALL_TIME("All Time"),
@@ -41,6 +49,7 @@ class HistoryViewModel(
     val selectedMonthYear = MutableStateFlow<String?>(null)
     val selectedDatePeriod = MutableStateFlow(DatePeriodFilter.ALL_TIME)
     val customDateRange = MutableStateFlow<Pair<Long, Long>?>(null)
+    val selectedTypeFilter = MutableStateFlow(TransactionTypeFilter.ALL)
 
     val availableCategories = Category.DEFAULT_CATEGORIES
 
@@ -79,7 +88,7 @@ class HistoryViewModel(
     val monthYearTotals: StateFlow<Map<String, Double>> = allTransactions
         .map { list: List<Transaction> ->
             val fmt = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-            val confirmed = list.filter { it.status == TransactionStatus.CONFIRMED }
+            val confirmed = list.filter { it.status == TransactionStatus.CONFIRMED && it.direction == TransactionDirection.DEBIT }
             val grouped = confirmed.groupBy { fmt.format(Date(it.timestamp)) }
             grouped.mapValues { entry -> entry.value.sumOf { txn -> txn.amount } }
         }
@@ -96,7 +105,8 @@ class HistoryViewModel(
         selectedStatus,
         selectedDatePeriod,
         customDateRange,
-        selectedMonthYear
+        selectedMonthYear,
+        selectedTypeFilter
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         val transactions = args[0] as List<Transaction>
@@ -107,6 +117,7 @@ class HistoryViewModel(
         @Suppress("UNCHECKED_CAST")
         val customRange = args[5] as Pair<Long, Long>?
         val monthYear = args[6] as String?
+        val typeFilter = args[7] as TransactionTypeFilter
 
         val (rangeStart, rangeEnd) = when (period) {
             DatePeriodFilter.ALL_TIME -> null to null
@@ -131,7 +142,13 @@ class HistoryViewModel(
                     (rangeEnd == null || txn.timestamp <= rangeEnd)
             val matchesMonth = monthYear == null || fmt.format(Date(txn.timestamp)) == monthYear
 
-            matchesQuery && matchesCategory && matchesStatus && matchesDateRange && matchesMonth
+            val matchesType = when (typeFilter) {
+                TransactionTypeFilter.ALL -> true
+                TransactionTypeFilter.EXPENSES_ONLY -> txn.direction == TransactionDirection.DEBIT
+                TransactionTypeFilter.INCOME_ONLY -> txn.direction == TransactionDirection.CREDIT
+            }
+
+            matchesQuery && matchesCategory && matchesStatus && matchesDateRange && matchesMonth && matchesType
         }
     }.stateIn(
         scope = viewModelScope,
@@ -173,6 +190,10 @@ class HistoryViewModel(
         }
     }
 
+    fun onTypeFilterSelect(type: TransactionTypeFilter) {
+        selectedTypeFilter.value = type
+    }
+
     fun clearAllFilters() {
         searchQuery.value = ""
         selectedCategory.value = null
@@ -180,6 +201,7 @@ class HistoryViewModel(
         selectedMonthYear.value = null
         selectedDatePeriod.value = DatePeriodFilter.ALL_TIME
         customDateRange.value = null
+        selectedTypeFilter.value = TransactionTypeFilter.ALL
     }
 
     private fun getTodayRange(): Pair<Long, Long> {

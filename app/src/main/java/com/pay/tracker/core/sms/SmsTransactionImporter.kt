@@ -112,7 +112,11 @@ class SmsTransactionImporter(
                     }
 
                     // Auto categorize
-                    val category = categorySuggester.suggestCategory(parsed.merchant, body)
+                    val category = categorySuggester.suggestCategory(
+                        merchant = parsed.merchant,
+                        rawText = body,
+                        classification = parsed.classification
+                    )
 
                     // Assign status: High confidence -> CONFIRMED, Uncertain/Ambiguous -> PENDING for review
                     val status = if (parsed.confidence >= 0.85f) {
@@ -198,7 +202,11 @@ class SmsTransactionImporter(
                         continue
                     }
 
-                    val category = categorySuggester.suggestCategory(parsed.merchant, body)
+                    val category = categorySuggester.suggestCategory(
+                        merchant = parsed.merchant,
+                        rawText = body,
+                        classification = parsed.classification
+                    )
                     val status = if (parsed.confidence >= 0.85f) {
                         TransactionStatus.CONFIRMED
                     } else {

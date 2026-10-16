@@ -84,6 +84,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.pay.tracker.core.model.Category
+import com.pay.tracker.core.model.TransactionDirection
+import com.pay.tracker.core.model.TransactionClassification
 import com.pay.tracker.core.sms.SmsImportResult
 import com.pay.tracker.ui.components.BotanicalCreamButton
 import com.pay.tracker.ui.components.BotanicalGlassButton
@@ -136,6 +138,7 @@ fun DashboardScreen(
     val availableMonths by viewModel.availableMonths.collectAsState()
     val yearlySpendSummaries by viewModel.yearlySpendSummaries.collectAsState()
     val monthlySpendMap by viewModel.monthlySpendMap.collectAsState()
+    val cashFlowMetrics by viewModel.cashFlowMetrics.collectAsState()
 
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var showEditBudgetDialog by remember { mutableStateOf(false) }
@@ -202,7 +205,9 @@ fun DashboardScreen(
                     totalDays = budgetPacing.totalDaysInMonth,
                     dailySpends = monthDailySpendHistory,
                     isCurrentMonth = selectedYearMonth.isCurrentMonth,
-                    previousMonthTotal = previousMonthTotal
+                    previousMonthTotal = previousMonthTotal,
+                    incomeReceived = cashFlowMetrics.incomeReceived,
+                    netCashFlow = cashFlowMetrics.netCashFlow
                 )
             }
 
@@ -276,8 +281,8 @@ fun DashboardScreen(
     if (showAddExpenseSheet) {
         AddExpenseBottomSheet(
             onDismissRequest = { showAddExpenseSheet = false },
-            onSaveExpense = { amount, merchant, category ->
-                viewModel.addManualExpense(amount, merchant, category)
+            onSaveTransaction = { amount, merchant, category, direction, classification ->
+                viewModel.addManualTransaction(amount, merchant, category, direction, classification)
             }
         )
     }
@@ -472,7 +477,9 @@ private fun HeroSpendingVelocityCard(
     totalDays: Int,
     dailySpends: List<DailySpend>,
     isCurrentMonth: Boolean,
-    previousMonthTotal: Double
+    previousMonthTotal: Double,
+    incomeReceived: Double = 0.0,
+    netCashFlow: Double = 0.0
 ) {
     BotanicalGlassCard(
         modifier = Modifier.fillMaxWidth()
@@ -503,6 +510,30 @@ private fun HeroSpendingVelocityCard(
                         letterSpacing = (-1).sp,
                         color = Color.White
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Received: +₹${"%,.0f".format(incomeReceived)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = BotanicalEmerald
+                        )
+                        Text(
+                            text = " • ",
+                            fontSize = 12.sp,
+                            color = BotanicalTextSecondary.copy(alpha = 0.6f)
+                        )
+                        val netSign = if (netCashFlow >= 0) "+₹" else "-₹"
+                        val netColor = if (netCashFlow >= 0) BotanicalEmerald else Color(0xFFFF857D)
+                        Text(
+                            text = "Net Cash Flow: $netSign${"%,.0f".format(Math.abs(netCashFlow))}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = netColor
+                        )
+                    }
                 }
 
                 // Dynamic Trend badge vs previous month
@@ -747,6 +778,15 @@ private fun BotanicalBudgetCard(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
+                        if (pacing.eligibleOffsets > 0) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Net left: ${CategoryUiUtils.formatCurrency(pacing.netRemainingBudget)} (after +₹${"%,.0f".format(pacing.eligibleOffsets)} refunds)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = BotanicalEmerald
+                            )
+                        }
                     } else {
                         if (!pacing.isExceeded) {
                             Text(
@@ -755,6 +795,15 @@ private fun BotanicalBudgetCard(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF81C784)
                             )
+                            if (pacing.eligibleOffsets > 0) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Net saved: ${CategoryUiUtils.formatCurrency(pacing.netRemainingBudget)} (after +₹${"%,.0f".format(pacing.eligibleOffsets)} refunds)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = BotanicalEmerald
+                                )
+                            }
                         } else {
                             val overSpend = pacing.spentThisMonth - pacing.budgetTarget
                             Text(
@@ -763,6 +812,17 @@ private fun BotanicalBudgetCard(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFFF5252)
                             )
+                            if (pacing.eligibleOffsets > 0) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val netOver = pacing.netSpentThisMonth - pacing.budgetTarget
+                                val netOverText = if (netOver > 0) "Net over: ₹${"%,.0f".format(netOver)}" else "Net saved: ${CategoryUiUtils.formatCurrency(pacing.netRemainingBudget)}"
+                                Text(
+                                    text = "$netOverText (after +₹${"%,.0f".format(pacing.eligibleOffsets)} refunds)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = BotanicalEmerald
+                                )
+                            }
                         }
                     }
                 }
@@ -1185,15 +1245,16 @@ private fun EditBudgetDialog(
 @Composable
 private fun AddExpenseBottomSheet(
     onDismissRequest: () -> Unit,
-    onSaveExpense: (Double, String, String) -> Unit
+    onSaveTransaction: (Double, String, String, TransactionDirection, TransactionClassification) -> Unit
 ) {
+    var isExpenseType by remember { mutableStateOf(true) }
     var amountText by remember { mutableStateOf("") }
     var merchantText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Food") }
     var hasError by remember { mutableStateOf(false) }
 
-    val categories = remember {
-        Category.DEFAULT_CATEGORIES
+    val categories = remember(isExpenseType) {
+        if (isExpenseType) Category.EXPENSE_CATEGORIES else Category.INCOME_CATEGORIES
     }
 
     ModalBottomSheet(
@@ -1218,11 +1279,65 @@ private fun AddExpenseBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Add Expense",
+                text = if (isExpenseType) "Add Expense" else "Add Income",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
+
+            // Segmented Toggle: Expense (Money Out) vs Income (Money In)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0x33253B2F))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Surface(
+                    onClick = {
+                        isExpenseType = true
+                        selectedCategory = "Food"
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isExpenseType) BotanicalCreamPill else Color.Transparent,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Expense (Money Out)",
+                            fontSize = 12.sp,
+                            fontWeight = if (isExpenseType) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isExpenseType) BotanicalCreamPillText else BotanicalTextSecondary
+                        )
+                    }
+                }
+
+                Surface(
+                    onClick = {
+                        isExpenseType = false
+                        selectedCategory = "Salary"
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (!isExpenseType) BotanicalCreamPill else Color.Transparent,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Income (Money In)",
+                            fontSize = 12.sp,
+                            fontWeight = if (!isExpenseType) FontWeight.Bold else FontWeight.Medium,
+                            color = if (!isExpenseType) BotanicalCreamPillText else BotanicalTextSecondary
+                        )
+                    }
+                }
+            }
 
             // Amount field
             OutlinedTextField(
@@ -1246,12 +1361,22 @@ private fun AddExpenseBottomSheet(
                 shape = RoundedCornerShape(16.dp)
             )
 
-            // Merchant field
+            // Merchant / Source field
             OutlinedTextField(
                 value = merchantText,
                 onValueChange = { merchantText = it; hasError = false },
-                label = { Text("Paid to / Merchant", color = BotanicalTextSecondary) },
-                placeholder = { Text("e.g. Swiggy, Starbucks, Grocery Store", color = Color(0x66FFFFFF)) },
+                label = {
+                    Text(
+                        text = if (isExpenseType) "Paid to / Merchant" else "Received from / Source",
+                        color = BotanicalTextSecondary
+                    )
+                },
+                placeholder = {
+                    Text(
+                        text = if (isExpenseType) "e.g. Swiggy, Starbucks, Grocery Store" else "e.g. Employer, Client, Friend, Bank",
+                        color = Color(0x66FFFFFF)
+                    )
+                },
                 singleLine = true,
                 isError = hasError && merchantText.trim().isEmpty(),
                 keyboardOptions = KeyboardOptions(
@@ -1315,14 +1440,24 @@ private fun AddExpenseBottomSheet(
             Spacer(modifier = Modifier.height(4.dp))
 
             BotanicalCreamButton(
-                text = "Save Expense",
+                text = if (isExpenseType) "Save Expense" else "Save Income",
                 onClick = {
                     val parsedAmount = amountText.toDoubleOrNull()
                     val merchant = merchantText.trim()
                     if (parsedAmount == null || parsedAmount <= 0.0 || merchant.isEmpty()) {
                         hasError = true
                     } else {
-                        onSaveExpense(parsedAmount, merchant, selectedCategory)
+                        val direction = if (isExpenseType) TransactionDirection.DEBIT else TransactionDirection.CREDIT
+                        val classification = if (isExpenseType) {
+                            TransactionClassification.EXPENSE
+                        } else {
+                            when (selectedCategory) {
+                                "Refund" -> TransactionClassification.REFUND
+                                "Cashback" -> TransactionClassification.CASHBACK
+                                else -> TransactionClassification.INCOME
+                            }
+                        }
+                        onSaveTransaction(parsedAmount, merchant, selectedCategory, direction, classification)
                         onDismissRequest()
                     }
                 },

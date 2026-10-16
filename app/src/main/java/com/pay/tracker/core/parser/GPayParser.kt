@@ -1,10 +1,12 @@
 package com.pay.tracker.core.parser
 
+import com.pay.tracker.core.model.TransactionClassification
+import com.pay.tracker.core.model.TransactionDirection
 import java.security.MessageDigest
 import java.util.regex.Pattern
 
 /**
- * Robust parser for Google Pay (UPI) alerts and Indian Bank SMS debit notifications
+ * Robust parser for Google Pay (UPI) alerts and Indian Bank SMS debit & credit notifications
  * (Axis Bank, HDFC, ICICI, SBI, Google Messages, etc.).
  */
 class GPayParser {
@@ -19,8 +21,9 @@ class GPayParser {
         // UPI-428918291018-SWIGGY (ICICI Bank SMS)
         // UPI/428918291019/ZEPTO/Paytm (ICICI Bank SMS)
         // UPI/P2P/123456789012/Rahul
+        // UPI/CR/123456789012/Sender
         private val PATTERN_UPI_PATH = Pattern.compile(
-            """(?:UPI|Info:\s*UPI)[/_\-:](?:(?:P2M|P2P|REV|DR)[/_\-:])?([A-Za-z0-9]{6,})[/_\-:]([A-Za-z0-9_.\-]+?)(?:[/_\-\s.,]|$)""",
+            """(?:UPI|Info:\s*UPI)[/_\-:](?:(?:P2M|P2P|P2A|REV|DR|CR)[/_\-:])?([A-Za-z0-9]{6,})[/_\-:]([A-Za-z0-9_.\- ]+?)(?:[/_\-:\r\n\t.,]|$)""",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -148,6 +151,60 @@ class GPayParser {
             """(?:upi\s*ref(?:erence)?(?:\s*no\.?)?|ref\s*no\.?|\bref\b|txn\s*id|upi\s*txn(?:\s*id)?|rrn)\s*[:\-]?\s*([A-Za-z0-9]{6,})""",
             Pattern.CASE_INSENSITIVE
         )
+
+        // Credit Pattern 1: "INR 2,500.00 credited" or "Rs 500 has been credited"
+        private val PATTERN_AMOUNT_CREDITED = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has\s+been\s+|is\s+|was\s+)?credited""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 2: "credited with INR 1,500" or "credited by Rs 500" or "credited for INR 200"
+        private val PATTERN_CREDITED_AMOUNT = Pattern.compile(
+            """\bcredited\s*(?:to\s+[^.,\n]+?\s+(?:with|for|by|of)\s*)?(?:with|for|by|of|[:\-])?\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 3: "Received ₹1,500 from Amit Kumar" or "Received INR 500 by Rahul"
+        private val PATTERN_RECEIVED_FROM = Pattern.compile(
+            """\breceived\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)\s+(?:from|by)\s+([^.,\n]+?)(?:\s+(?:using|with|via|upi|on|in|to)\b|\s*\.|\s*$)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 4: "₹1,500 received from Suresh"
+        private val PATTERN_AMOUNT_RECEIVED_FROM = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has\s+been\s+|was\s+)?received\s+(?:from|by)\s+([^.,\n]+?)(?:\s+(?:using|with|via|upi|on|in|to)\b|\s*\.|\s*$)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 5: "Refund of INR 450.00" or "Refund of Rs 1,299"
+        private val PATTERN_REFUND_OF = Pattern.compile(
+            """(?:refund|refunded)\s+(?:of\s+)?(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 5b: "INR 450.00 refunded"
+        private val PATTERN_AMOUNT_REFUNDED = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has\s+been\s+|was\s+|is\s+)?(?:refunded|credited\s+as\s+refund)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 6: "Cashback of Rs. 50 credited" or "Cashback of INR 100"
+        private val PATTERN_CASHBACK_OF = Pattern.compile(
+            """(?:cashback|cash\s+back)\s+(?:of\s+)?(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 6b: "INR 50 cashback"
+        private val PATTERN_AMOUNT_CASHBACK = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has\s+been\s+|was\s+|is\s+)?cashback""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Credit Pattern 7: "amount deposited INR 5,000"
+        private val PATTERN_DEPOSITED_AMOUNT = Pattern.compile(
+            """(?:deposited|amount\s+deposited)\s*(?:of\s+)?(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
     }
 
     /**
@@ -247,6 +304,78 @@ class GPayParser {
     }
 
     /**
+     * Checks if notification text represents an actual, completed credit/received money.
+     * Rejects:
+     * - OTPs, verification codes, money requests
+     * - Failed, declined, timed out, expired transactions
+     * - Mandate / AutoPay / Standing Instruction lifecycle alerts
+     * - Balance inquiries, credit limit notifications, bill due notices
+     * - Promotional loan offers and gaming/rummy wallet promos
+     *
+     * Requires explicit positive evidence of an actual completed credit (e.g. salary, P2P incoming, refund, cashback).
+     */
+    fun isCreditNotification(title: String, text: String): Boolean {
+        val combined = "$title $text".lowercase()
+
+        // 1. Mandatory exclusion: OTPs, verification codes, money requests
+        val requestOrSecurityKeywords = listOf(
+            "otp", "verification code", "security code", "one time password",
+            "requested money", "request from", "request for inr", "request for rs",
+            "has requested", "request received", "collect request"
+        )
+        if (requestOrSecurityKeywords.any { combined.contains(it) }) {
+            return false
+        }
+
+        // 2. Mandatory exclusion: Failed, declined, timed out, expired transactions
+        val failurePatterns = listOf(
+            Regex("""\b(?:failed|declined|unsuccessful|timed\s+out|expired|bounced)\b"""),
+            Regex("""\b(?:unable\s+to\s+credit|could\s+not\s+be\s+credited)\b""")
+        )
+        if (failurePatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 3. Mandatory exclusion: Mandates, AutoPay setups, subscriptions
+        val mandatePatterns = listOf(
+            Regex("""\b(?:mandate|e-mandate|emandate|autopay|standing\s+instruction)\s+.*?\b(?:created|revoked|cancelled|canceled|modified|registered)\b"""),
+            Regex("""\b(?:subscription\s+created|subscription\s+cancelled|subscription\s+canceled)\b"""),
+            Regex("""\b(?:renewal\s+reminder|upcoming\s+(?:payment|debit|autopay)|scheduled\s+for)\b""")
+        )
+        if (mandatePatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 4. Mandatory exclusion: Balance alerts, limit alerts, loan offers, bills
+        val alertPatterns = listOf(
+            Regex("""\b(?:avl\s+bal|available\s+balance|current\s+balance|account\s+balance\s+is|total\s+balance)\b"""),
+            Regex("""\b(?:credit\s+card\s+limit|available\s+credit\s+limit|credit\s+limit\s+is)\b"""),
+            Regex("""\b(?:pre-approved|apply\s+now|instant\s+loan|personal\s+loan|loan\s+approved|winzo|rummy|game\s+wallet)\b"""),
+            Regex("""\b(?:bill\s+generated|statement\s+generated|payment\s+due|amount\s+due|bill\s+is\s+due)\b""")
+        )
+        if (alertPatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 5. Positive requirement: Must have explicit evidence of an actual completed credit
+        val completedCreditPatterns = listOf(
+            Regex("""\b(?:has\s+been\s+|is\s+|was\s+)?credited\b"""),
+            Regex("""\b(?:received\s+(?:inr|rs\.?|₹)?\s*[\d,]+|[\d,]+(?:\.\d{1,2})?\s*received\s+from)\b"""),
+            Regex("""\b(?:refund\s+of|refunded\s+to|refund\s+credited|amount\s+refunded)\b"""),
+            Regex("""\b(?:cashback\s+of|cashback\s+received|cashback\s+credited)\b"""),
+            Regex("""\b(?:amount\s+deposited|salary\s+credited|salary\s+of)\b""")
+        )
+        return completedCreditPatterns.any { it.containsMatchIn(combined) }
+    }
+
+    /**
+     * Checks if notification text represents either a completed debit or a completed credit.
+     */
+    fun isCompletedTransaction(title: String, text: String): Boolean {
+        return isDebitNotification(title, text) || isCreditNotification(title, text)
+    }
+
+    /**
      * Parses notification title, text, and metadata into a [ParsedTransaction].
      * Returns null if no valid payment pattern matches or if the message is not an actual completed debit.
      */
@@ -258,8 +387,15 @@ class GPayParser {
     ): ParsedTransaction? {
         val fullContent = "$title\n$text"
 
-        if (!isDebitNotification(title, text)) {
+        val isDebit = isDebitNotification(title, text)
+        val isCredit = if (!isDebit) isCreditNotification(title, text) else false
+
+        if (!isDebit && !isCredit) {
             return null
+        }
+
+        if (isCredit) {
+            return parseCredit(fullContent, title, postTime, packageName)
         }
 
         var amount: Double? = null
@@ -426,8 +562,178 @@ class GPayParser {
             sourceApp = packageName,
             rawNotification = fullContent.trim(),
             fingerprint = fingerprint,
-            confidence = confidence
+            confidence = confidence,
+            direction = TransactionDirection.DEBIT,
+            classification = TransactionClassification.EXPENSE
         )
+    }
+
+    /**
+     * Parses completed incoming credits, refunds, cashbacks, and own-account transfers.
+     */
+    private fun parseCredit(
+        fullContent: String,
+        title: String,
+        postTime: Long,
+        packageName: String
+    ): ParsedTransaction? {
+        val amount = extractCreditAmount(fullContent)
+        if (amount == null || amount <= 0.0) {
+            return null
+        }
+
+        var referenceId: String? = null
+        var merchant: String? = null
+
+        // 1. Check UPI Path: e.g. UPI/P2P/123456789012/Sender or UPI/CR/123456789012/Sender
+        val upiMatcher = PATTERN_UPI_PATH.matcher(fullContent)
+        if (upiMatcher.find()) {
+            referenceId = upiMatcher.group(1)
+            merchant = cleanMerchant(upiMatcher.group(2))
+        }
+
+        // 2. Check "received from <sender>" or "amount received from <sender>"
+        if (merchant.isNullOrBlank()) {
+            val mRec = PATTERN_RECEIVED_FROM.matcher(fullContent)
+            if (mRec.find()) {
+                merchant = cleanMerchant(mRec.group(2))
+            }
+        }
+        if (merchant.isNullOrBlank()) {
+            val mAmtRec = PATTERN_AMOUNT_RECEIVED_FROM.matcher(fullContent)
+            if (mAmtRec.find()) {
+                merchant = cleanMerchant(mAmtRec.group(2))
+            }
+        }
+
+        // 3. Check "credited by <sender>" or "from <sender>" or "by transfer from <sender>"
+        if (merchant.isNullOrBlank()) {
+            val mFrom = Regex("""(?:credited\s+(?:by|from)|by\s+transfer\s+from|from)\s+([A-Za-z0-9_.\- ]+?)(?:\s+(?:Ref|UPI|Txn|Bal|Avl|A/c|on)\b|\s*\.|\s*$)""", RegexOption.IGNORE_CASE).find(fullContent)
+            if (mFrom != null) {
+                merchant = cleanMerchant(mFrom.groupValues[1])
+            }
+        }
+
+        // 4. Extract UPI reference if not yet extracted
+        if (referenceId == null) {
+            val refMatcher = PATTERN_UPI_REF.matcher(fullContent)
+            if (refMatcher.find()) {
+                referenceId = refMatcher.group(1)
+            }
+        }
+
+        // 5. Determine Classification
+        val lower = fullContent.lowercase()
+        val classification = when {
+            Regex("""\b(?:transfer\s+to\s+self|transfer\s+from\s+self|self\s+transfer|own\s+account|from\s+own\s+a/c|between\s+own\s+accounts)\b""").containsMatchIn(lower) ->
+                TransactionClassification.TRANSFER
+            Regex("""\b(?:refund|refunded|reversal)\b""").containsMatchIn(lower) ->
+                TransactionClassification.REFUND
+            Regex("""\b(?:cashback|cash\s+back|reward\s+credited)\b""").containsMatchIn(lower) ->
+                TransactionClassification.CASHBACK
+            Regex("""\b(?:salary|payroll|stipend|wages|remuneration|corp\s+salary)\b""").containsMatchIn(lower) ->
+                TransactionClassification.INCOME
+            else ->
+                TransactionClassification.INCOME
+        }
+
+        if (merchant.isNullOrBlank()) {
+            val cleanTitle = cleanMerchant(title)
+            val genericTitles = setOf("google pay", "phonepe", "paytm", "cred", "bhim", "gpay", "payment", "bank", "upi", "messages", "sms", "alert")
+            merchant = if (!cleanTitle.isNullOrBlank() && cleanTitle.lowercase() !in genericTitles) {
+                cleanTitle
+            } else {
+                when (classification) {
+                    TransactionClassification.REFUND -> "Merchant Refund"
+                    TransactionClassification.CASHBACK -> "Reward Cashback"
+                    TransactionClassification.TRANSFER -> "Self Account"
+                    else -> "Sender"
+                }
+            }
+        }
+
+        val hasExplicitMerchant = !merchant.isNullOrBlank() && merchant !in setOf("Sender", "Merchant Refund", "Reward Cashback", "Self Account")
+        val hasRefId = !referenceId.isNullOrBlank()
+
+        val confidence = when {
+            hasRefId && hasExplicitMerchant -> 0.98f
+            hasExplicitMerchant -> 0.90f
+            hasRefId -> 0.85f
+            else -> 0.75f
+        }
+
+        val fingerprint = generateFingerprint(amount, merchant, postTime, referenceId)
+
+        return ParsedTransaction(
+            amount = amount,
+            merchant = merchant,
+            referenceId = referenceId,
+            timestamp = postTime,
+            sourceApp = packageName,
+            rawNotification = fullContent.trim(),
+            fingerprint = fingerprint,
+            confidence = confidence,
+            direction = TransactionDirection.CREDIT,
+            classification = classification
+        )
+    }
+
+    private fun extractCreditAmount(content: String): Double? {
+        val m1 = PATTERN_AMOUNT_CREDITED.matcher(content)
+        if (m1.find()) {
+            val amt = parseAmount(m1.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val m2 = PATTERN_CREDITED_AMOUNT.matcher(content)
+        if (m2.find()) {
+            val amt = parseAmount(m2.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mRec = PATTERN_RECEIVED_FROM.matcher(content)
+        if (mRec.find()) {
+            val amt = parseAmount(mRec.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mAmtRec = PATTERN_AMOUNT_RECEIVED_FROM.matcher(content)
+        if (mAmtRec.find()) {
+            val amt = parseAmount(mAmtRec.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mRef = PATTERN_REFUND_OF.matcher(content)
+        if (mRef.find()) {
+            val amt = parseAmount(mRef.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mAmtRef = PATTERN_AMOUNT_REFUNDED.matcher(content)
+        if (mAmtRef.find()) {
+            val amt = parseAmount(mAmtRef.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mCash = PATTERN_CASHBACK_OF.matcher(content)
+        if (mCash.find()) {
+            val amt = parseAmount(mCash.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mAmtCash = PATTERN_AMOUNT_CASHBACK.matcher(content)
+        if (mAmtCash.find()) {
+            val amt = parseAmount(mAmtCash.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mDep = PATTERN_DEPOSITED_AMOUNT.matcher(content)
+        if (mDep.find()) {
+            val amt = parseAmount(mDep.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        return null
     }
 
     private fun extractAmount(content: String): Double? {
@@ -511,7 +817,7 @@ class GPayParser {
 
         // 3. Strip leading prepositions
         cleaned = cleaned
-            .replace(Regex("""^(using|with|via|to|at|towards|for|transfer\s+to|by\s+transfer\s+to)\s+""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""^(using|with|via|to|at|towards|for|from|by|transfer\s+to|by\s+transfer\s+to|transfer\s+from|by\s+transfer\s+from)\s+""", RegexOption.IGNORE_CASE), "")
             .trim()
 
         // 4. Strip trailing bank/account metadata

@@ -89,6 +89,9 @@ import com.pay.tracker.ui.theme.BotanicalGlassButton
 import com.pay.tracker.ui.theme.BotanicalGlassButtonBorder
 import com.pay.tracker.ui.theme.BotanicalTextPrimary
 import com.pay.tracker.ui.theme.BotanicalTextSecondary
+import com.pay.tracker.core.model.TransactionDirection
+import com.pay.tracker.core.model.TransactionClassification
+import com.pay.tracker.ui.viewmodel.TransactionTypeFilter
 import com.pay.tracker.ui.viewmodel.HistoryViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,12 +112,14 @@ fun HistoryScreen(
     val monthYearTotals by viewModel.monthYearTotals.collectAsState()
     val selectedDatePeriod by viewModel.selectedDatePeriod.collectAsState()
     val customDateRange by viewModel.customDateRange.collectAsState()
+    val selectedTypeFilter by viewModel.selectedTypeFilter.collectAsState()
     val categories = viewModel.availableCategories
 
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     var selectedTransactionDetails by remember { mutableStateOf<Transaction?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
+    var typeMenuExpanded by remember { mutableStateOf(false) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
     var statusMenuExpanded by remember { mutableStateOf(false) }
     var monthMenuExpanded by remember { mutableStateOf(false) }
@@ -303,12 +308,69 @@ fun HistoryScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 4. Compact Controls Row: Category Dropdown, Status Dropdown, Month Dropdown, Clear Button
+            // 4. Compact Controls Row: Type Dropdown, Category Dropdown, Status Dropdown, Month Dropdown, Clear Button
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Type Filter Dropdown
+                Box {
+                    val isTypeFiltered = (selectedTypeFilter != TransactionTypeFilter.ALL)
+                    Surface(
+                        onClick = { typeMenuExpanded = true },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isTypeFiltered) Color(0x33253B2F) else BotanicalGlassButton,
+                        border = BorderStroke(1.dp, if (isTypeFiltered) BotanicalEmerald.copy(alpha = 0.5f) else BotanicalGlassButtonBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Type: ${selectedTypeFilter.label}",
+                                fontSize = 12.sp,
+                                fontWeight = if (isTypeFiltered) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isTypeFiltered) Color.White else BotanicalTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = BotanicalTextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = typeMenuExpanded,
+                        onDismissRequest = { typeMenuExpanded = false },
+                        modifier = Modifier.background(Color(0xFF14241C))
+                    ) {
+                        TransactionTypeFilter.values().forEach { type ->
+                            val isSelected = (selectedTypeFilter == type)
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = type.label,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) BotanicalEmerald else Color.White
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.onTypeFilterSelect(type)
+                                    typeMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 // Category Filter Dropdown
                 Box {
                     val hasCategory = (selectedCategory != null)
@@ -572,7 +634,8 @@ fun HistoryScreen(
                         selectedStatus != null ||
                         selectedMonthYear != null ||
                         selectedDatePeriod != DatePeriodFilter.ALL_TIME ||
-                        customDateRange != null
+                        customDateRange != null ||
+                        selectedTypeFilter != TransactionTypeFilter.ALL
 
                 if (isFilterActive) {
                     Surface(
@@ -606,7 +669,29 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // 5. Active Filter & Spend Summary Banner
-            val filteredTotal = remember(transactions) { transactions.sumOf { it.amount } }
+            val filteredDebits = remember(transactions) {
+                transactions.filter { it.direction == TransactionDirection.DEBIT }.sumOf { it.amount }
+            }
+            val filteredCredits = remember(transactions) {
+                transactions.filter { it.direction == TransactionDirection.CREDIT }.sumOf { it.amount }
+            }
+            val summaryText = remember(selectedTypeFilter, filteredDebits, filteredCredits) {
+                when (selectedTypeFilter) {
+                    TransactionTypeFilter.EXPENSES_ONLY -> "Spent: ₹${"%,.2f".format(filteredDebits)}"
+                    TransactionTypeFilter.INCOME_ONLY -> "Received: +₹${"%,.2f".format(filteredCredits)}"
+                    TransactionTypeFilter.ALL -> {
+                        when {
+                            filteredDebits > 0 && filteredCredits > 0 ->
+                                "Spent: ₹${"%,.0f".format(filteredDebits)}  •  Received: +₹${"%,.0f".format(filteredCredits)}"
+                            filteredCredits > 0 ->
+                                "Received: +₹${"%,.2f".format(filteredCredits)}"
+                            else ->
+                                "Total Spent: ₹${"%,.2f".format(filteredDebits)}"
+                        }
+                    }
+                }
+            }
+
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = Color(0x2B104F32),
@@ -627,7 +712,7 @@ fun HistoryScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Total: ₹${"%,.2f".format(filteredTotal)}",
+                        text = summaryText,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = BotanicalEmerald
@@ -737,7 +822,8 @@ fun HistoryScreen(
 
                         // Days within this month
                         daysMap.forEach { (dateHeader, txnsForDate) ->
-                            val dayTotal = txnsForDate.sumOf { it.amount }
+                            val dayDebits = txnsForDate.filter { it.direction == TransactionDirection.DEBIT }.sumOf { it.amount }
+                            val dayCredits = txnsForDate.filter { it.direction == TransactionDirection.CREDIT }.sumOf { it.amount }
 
                             item(key = "header_${monthName}_$dateHeader") {
                                 Row(
@@ -753,11 +839,20 @@ fun HistoryScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = Color.White
                                     )
+                                    val dateTotalText = when {
+                                        dayDebits > 0 && dayCredits > 0 ->
+                                            "- ${CategoryUiUtils.formatCurrency(dayDebits)}  •  + ${CategoryUiUtils.formatCurrency(dayCredits)}"
+                                        dayCredits > 0 ->
+                                            "+ " + CategoryUiUtils.formatCurrency(dayCredits)
+                                        else ->
+                                            "- " + CategoryUiUtils.formatCurrency(dayDebits)
+                                    }
+                                    val dateTotalColor = if (dayDebits == 0.0 && dayCredits > 0.0) BotanicalEmerald else BotanicalTextSecondary
                                     Text(
-                                        text = "- " + CategoryUiUtils.formatCurrency(dayTotal),
+                                        text = dateTotalText,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = BotanicalTextSecondary
+                                        color = dateTotalColor
                                     )
                                 }
                             }
@@ -954,22 +1049,56 @@ private fun BotanicalTransactionRow(
         }
 
         // Amount & Status
+        val isCredit = (transaction.direction == TransactionDirection.CREDIT)
+        val amountPrefix = if (isCredit) "+ " else "- "
+        val amountColor = if (isCredit) BotanicalEmerald else Color.White
+
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "- " + CategoryUiUtils.formatCurrency(transaction.amount),
+                text = amountPrefix + CategoryUiUtils.formatCurrency(transaction.amount),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = amountColor
             )
 
-            if (transaction.status == TransactionStatus.PENDING) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Pending",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = com.pay.tracker.ui.theme.PendingAmber
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (transaction.classification == TransactionClassification.REFUND) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Refund",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF4DD0E1)
+                    )
+                } else if (transaction.classification == TransactionClassification.CASHBACK) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Cashback",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFFD54F)
+                    )
+                } else if (transaction.classification == TransactionClassification.TRANSFER) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Transfer",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF90CAF9)
+                    )
+                }
+
+                if (transaction.status == TransactionStatus.PENDING) {
+                    if (transaction.classification != TransactionClassification.EXPENSE && transaction.classification != TransactionClassification.INCOME) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        text = "Pending",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = com.pay.tracker.ui.theme.PendingAmber
+                    )
+                }
             }
         }
     }
@@ -1414,46 +1543,76 @@ private fun TransactionDetailsBottomSheet(
                             color = BotanicalTextSecondary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
+                        val isCredit = (transaction.direction == TransactionDirection.CREDIT)
+                        val amountPrefix = if (isCredit) "+ " else "- "
+                        val amountColor = if (isCredit) BotanicalEmerald else Color.White
                         Text(
-                            text = "- " + CategoryUiUtils.formatCurrency(transaction.amount),
+                            text = amountPrefix + CategoryUiUtils.formatCurrency(transaction.amount),
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = amountColor
                         )
                     }
 
-                    // Status Badge
-                    Surface(
-                        shape = CircleShape,
-                        color = when (transaction.status) {
-                            TransactionStatus.CONFIRMED -> Color(0x2B81C784)
-                            TransactionStatus.PENDING -> Color(0x33FFB74D)
-                            TransactionStatus.REJECTED -> Color(0x33FF5252)
-                        },
-                        border = BorderStroke(
-                            1.dp,
-                            when (transaction.status) {
-                                TransactionStatus.CONFIRMED -> Color(0x4D81C784)
-                                TransactionStatus.PENDING -> Color(0x4DFFB74D)
-                                TransactionStatus.REJECTED -> Color(0x4DFF5252)
-                            }
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = when (transaction.status) {
-                                TransactionStatus.CONFIRMED -> "Confirmed"
-                                TransactionStatus.PENDING -> "Pending"
-                                TransactionStatus.REJECTED -> "Rejected"
-                            },
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
+                        if (transaction.classification != TransactionClassification.EXPENSE && transaction.classification != TransactionClassification.INCOME) {
+                            val (badgeBg, badgeBorder, badgeTextColor) = when (transaction.classification) {
+                                TransactionClassification.REFUND -> Triple(Color(0x334DD0E1), Color(0x664DD0E1), Color(0xFF4DD0E1))
+                                TransactionClassification.CASHBACK -> Triple(Color(0x33FFD54F), Color(0x66FFD54F), Color(0xFFFFD54F))
+                                TransactionClassification.TRANSFER -> Triple(Color(0x3390CAF9), Color(0x6690CAF9), Color(0xFF90CAF9))
+                                else -> Triple(Color(0x3381C784), Color(0x6681C784), Color(0xFF81C784))
+                            }
+                            Surface(
+                                shape = CircleShape,
+                                color = badgeBg,
+                                border = BorderStroke(1.dp, badgeBorder)
+                            ) {
+                                Text(
+                                    text = transaction.classification.name,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = badgeTextColor,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        // Status Badge
+                        Surface(
+                            shape = CircleShape,
                             color = when (transaction.status) {
-                                TransactionStatus.CONFIRMED -> Color(0xFF81C784)
-                                TransactionStatus.PENDING -> Color(0xFFFFB74D)
-                                TransactionStatus.REJECTED -> Color(0xFFFF6961)
+                                TransactionStatus.CONFIRMED -> Color(0x2B81C784)
+                                TransactionStatus.PENDING -> Color(0x33FFB74D)
+                                TransactionStatus.REJECTED -> Color(0x33FF5252)
                             },
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                            border = BorderStroke(
+                                1.dp,
+                                when (transaction.status) {
+                                    TransactionStatus.CONFIRMED -> Color(0x4D81C784)
+                                    TransactionStatus.PENDING -> Color(0x4DFFB74D)
+                                    TransactionStatus.REJECTED -> Color(0x4DFF5252)
+                                }
+                            )
+                        ) {
+                            Text(
+                                text = when (transaction.status) {
+                                    TransactionStatus.CONFIRMED -> "Confirmed"
+                                    TransactionStatus.PENDING -> "Pending"
+                                    TransactionStatus.REJECTED -> "Rejected"
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when (transaction.status) {
+                                    TransactionStatus.CONFIRMED -> Color(0xFF81C784)
+                                    TransactionStatus.PENDING -> Color(0xFFFFB74D)
+                                    TransactionStatus.REJECTED -> Color(0xFFFF6961)
+                                },
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }

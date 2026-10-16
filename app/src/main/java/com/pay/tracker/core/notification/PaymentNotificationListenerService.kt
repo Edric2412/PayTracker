@@ -110,9 +110,9 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             packageName.contains("messaging") ||
             packageName.contains("wallet")
 
-        val isDebit = gPayParser.isDebitNotification(title, body)
+        val isTransaction = gPayParser.isCompletedTransaction(title, body)
 
-        if (!isKnownApp && !isDebit) {
+        if (!isKnownApp && !isTransaction) {
             return
         }
 
@@ -124,7 +124,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             postTime = sbn.postTime,
             packageName = packageName
         ) ?: run {
-            Log.d(TAG, "Notification from $packageName did not match debit payment pattern.")
+            Log.d(TAG, "Notification from $packageName did not match payment pattern.")
             return
         }
 
@@ -143,10 +143,11 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                // 2. Suggest expense category (Local heuristic first, with Gemini AI fallback)
+                // 2. Suggest category (Local heuristic first, with Gemini AI fallback)
                 var suggestedCategory = categorySuggester.suggestCategory(
                     merchant = parsed.merchant,
-                    rawText = body
+                    rawText = body,
+                    classification = parsed.classification
                 )
 
                 // If local rules fall back to generic Transfer, query Gemini 3.5 Flash Lite

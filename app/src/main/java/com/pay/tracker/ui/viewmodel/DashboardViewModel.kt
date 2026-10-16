@@ -3,6 +3,10 @@ package com.pay.tracker.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pay.tracker.core.model.Transaction
+import com.pay.tracker.core.model.TransactionDirection
+import com.pay.tracker.core.model.TransactionClassification
+import com.pay.tracker.core.calculator.CashFlowCalculator
+import com.pay.tracker.core.calculator.CashFlowMetrics
 import com.pay.tracker.core.repository.TransactionRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,6 +44,9 @@ data class BudgetPacing(
     val budgetTarget: Double = 10000.0,
     val spentThisMonth: Double = 0.0,
     val remainingBudget: Double = 10000.0,
+    val netSpentThisMonth: Double = 0.0,
+    val netRemainingBudget: Double = 10000.0,
+    val eligibleOffsets: Double = 0.0,
     val safeDailyPace: Double = 0.0,
     val daysRemaining: Int = 1,
     val totalDaysInMonth: Int = 30,
@@ -232,12 +239,26 @@ class DashboardViewModel(
         initialValue = listOf(YearMonthSelection.current())
     )
 
+    val cashFlowMetrics: StateFlow<CashFlowMetrics> = combine(
+        selectedYearMonth,
+        budgetTarget,
+        repository.observeConfirmedTransactions()
+    ) { ym, target, txns ->
+        val monthTxns = txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
+        CashFlowCalculator.calculateMetrics(monthTxns, target)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = CashFlowMetrics()
+    )
+
     val previousMonthTotal: StateFlow<Double> = combine(
         selectedYearMonth,
         repository.observeConfirmedTransactions()
     ) { ym, txns ->
         val prev = ym.previous()
-        txns.filter { it.timestamp in prev.startEpoch()..prev.endEpoch() }.sumOf { it.amount }
+        val prevTxns = txns.filter { it.timestamp in prev.startEpoch()..prev.endEpoch() }
+        CashFlowCalculator.calculateGrossExpenses(prevTxns)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -286,16 +307,16 @@ class DashboardViewModel(
                         month = month,
                         monthName = mName,
                         displayName = "$mName $year",
-                        totalAmount = monthTxns.sumOf { it.amount },
-                        transactionCount = monthTxns.size,
+                        totalAmount = CashFlowCalculator.calculateGrossExpenses(monthTxns),
+                        transactionCount = monthTxns.count { CashFlowCalculator.isEligibleExpense(it) },
                         isCurrentMonth = (year == currentYear && month == currentMonth)
                     )
                 }
 
                 YearlySpendSummary(
                     year = year,
-                    totalAmount = yearTxns.sumOf { it.amount },
-                    transactionCount = yearTxns.size,
+                    totalAmount = CashFlowCalculator.calculateGrossExpenses(yearTxns),
+                    transactionCount = yearTxns.count { CashFlowCalculator.isEligibleExpense(it) },
                     months = monthSummaries
                 )
             }
@@ -311,9 +332,11 @@ class DashboardViewModel(
             val cal = Calendar.getInstance()
             val map = mutableMapOf<YearMonthSelection, Double>()
             txns.forEach { txn ->
-                cal.timeInMillis = txn.timestamp
-                val ym = YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
-                map[ym] = (map[ym] ?: 0.0) + txn.amount
+                if (CashFlowCalculator.isEligibleExpense(txn)) {
+                    cal.timeInMillis = txn.timestamp
+                    val ym = YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+                    map[ym] = (map[ym] ?: 0.0) + txn.amount
+                }
             }
             map
         }
@@ -325,18 +348,20 @@ class DashboardViewModel(
 
     val budgetPacing: StateFlow<BudgetPacing> = combine(
         budgetTarget,
-        selectedYearMonth,
-        repository.observeConfirmedTransactions()
-    ) { target, ym, txns ->
+        cashFlowMetrics,
+        selectedYearMonth
+    ) { target, metrics, ym ->
         val now = Calendar.getInstance()
         val totalDaysInMonth = ym.totalDays()
         val isCurrent = ym.isCurrentMonth
         val currentDay = if (isCurrent) now.get(Calendar.DAY_OF_MONTH) else totalDaysInMonth
         val daysRemaining = if (isCurrent) (totalDaysInMonth - currentDay + 1).coerceAtLeast(1) else 1
 
-        val monthTxns = txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
-        val spent = monthTxns.sumOf { it.amount }
-        val remaining = (target - spent).coerceAtLeast(0.0)
+        val spent = metrics.grossExpenses
+        val remaining = metrics.grossBudgetRemaining
+        val netSpent = metrics.netExpenses
+        val netRemaining = metrics.netBudgetRemaining
+        val offsets = metrics.eligibleOffsets
         val safeDaily = if (isCurrent) remaining / daysRemaining else 0.0
         val percent = if (target > 0) ((spent / target) * 100).toFloat() else 0f
         val isExceeded = spent > target
@@ -345,6 +370,9 @@ class DashboardViewModel(
             budgetTarget = target,
             spentThisMonth = spent,
             remainingBudget = remaining,
+            netSpentThisMonth = netSpent,
+            netRemainingBudget = netRemaining,
+            eligibleOffsets = offsets,
             safeDailyPace = safeDaily,
             daysRemaining = daysRemaining,
             totalDaysInMonth = totalDaysInMonth,
@@ -411,7 +439,7 @@ class DashboardViewModel(
         repository.observeConfirmedTransactions()
     ) { tf, txns ->
         val (startEpoch, endEpoch, daysCount) = getTimeframeRange(tf)
-        val filteredTxns = txns.filter { it.timestamp in startEpoch..endEpoch }
+        val filteredTxns = txns.filter { it.timestamp in startEpoch..endEpoch && CashFlowCalculator.isEligibleExpense(it) }
         val total = filteredTxns.sumOf { it.amount }
         val count = filteredTxns.size
         val dailyAvg = if (daysCount > 0) total / daysCount else 0.0
@@ -444,16 +472,13 @@ class DashboardViewModel(
         initialValue = TimeframeSummary()
     )
 
-    val monthlyTotal: StateFlow<Double> = combine(
-        selectedYearMonth,
-        repository.observeConfirmedTransactions()
-    ) { ym, txns ->
-        txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }.sumOf { it.amount }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0.0
-    )
+    val monthlyTotal: StateFlow<Double> = cashFlowMetrics
+        .map { it.grossExpenses }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0.0
+        )
 
     val pendingTransactions: StateFlow<List<Transaction>> = repository.observePendingTransactions()
         .stateIn(
@@ -473,31 +498,13 @@ class DashboardViewModel(
         initialValue = 0
     )
 
-    val categoryBreakdown: StateFlow<List<CategoryExpense>> = combine(
-        selectedYearMonth,
-        repository.observeConfirmedTransactions()
-    ) { ym, transactions ->
-        val monthTransactions = transactions.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
-        val total = monthTransactions.sumOf { it.amount }
-        if (total == 0.0) {
-            emptyList()
-        } else {
-            monthTransactions.groupBy { it.category }
-                .map { (cat, list) ->
-                    val sum = list.sumOf { it.amount }
-                    CategoryExpense(
-                        category = cat,
-                        totalAmount = sum,
-                        percentage = ((sum / total) * 100).toFloat()
-                    )
-                }
-                .sortedByDescending { it.totalAmount }
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val categoryBreakdown: StateFlow<List<CategoryExpense>> = cashFlowMetrics
+        .map { it.categoryBreakdown }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     val dailySpendHistory: StateFlow<List<DailySpend>> = repository.observeConfirmedTransactions()
         .map { transactions ->
@@ -516,7 +523,7 @@ class DashboardViewModel(
                 val endOfDay = startOfDay + 86_400_000L - 1L
 
                 val dayTotal = transactions
-                    .filter { it.timestamp in startOfDay..endOfDay }
+                    .filter { it.timestamp in startOfDay..endOfDay && CashFlowCalculator.isEligibleExpense(it) }
                     .sumOf { it.amount }
 
                 result.add(
@@ -562,7 +569,7 @@ class DashboardViewModel(
             val endOfDay = startOfDay + 86_400_000L - 1L
 
             val dayTotal = if (!isCurrent || day <= currentDay) {
-                monthTxns.filter { it.timestamp in startOfDay..endOfDay }.sumOf { it.amount }
+                monthTxns.filter { it.timestamp in startOfDay..endOfDay && CashFlowCalculator.isEligibleExpense(it) }.sumOf { it.amount }
             } else 0.0
 
             result.add(
@@ -595,7 +602,7 @@ class DashboardViewModel(
         repository.observeConfirmedTransactions()
     ) { ym, txns ->
         val monthTxns = txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
-        val total = monthTxns.sumOf { it.amount }
+        val total = CashFlowCalculator.calculateGrossExpenses(monthTxns)
         val now = Calendar.getInstance()
         val effectiveDays = if (ym.isCurrentMonth) {
             now.get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
@@ -613,7 +620,7 @@ class DashboardViewModel(
         selectedYearMonth,
         repository.observeConfirmedTransactions()
     ) { ym, txns ->
-        txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }.maxByOrNull { it.amount }
+        txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() && CashFlowCalculator.isEligibleExpense(it) }.maxByOrNull { it.amount }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -634,14 +641,16 @@ class DashboardViewModel(
     private val _isImporting = kotlinx.coroutines.flow.MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting
 
-    fun addManualExpense(
+    fun addManualTransaction(
         amount: Double,
         merchant: String,
         category: String,
+        direction: TransactionDirection = TransactionDirection.DEBIT,
+        classification: TransactionClassification = TransactionClassification.EXPENSE,
         timestamp: Long = System.currentTimeMillis()
     ) {
         viewModelScope.launch {
-            val fingerprint = "${amount}_${merchant}_${timestamp}_manual"
+            val fingerprint = "${amount}_${merchant}_${timestamp}_manual_${direction.name}"
             val txn = Transaction(
                 id = 0,
                 amount = amount,
@@ -650,12 +659,30 @@ class DashboardViewModel(
                 timestamp = timestamp,
                 status = com.pay.tracker.core.model.TransactionStatus.CONFIRMED,
                 sourceApp = "Manual",
-                rawNotification = "Manual expense entry",
+                rawNotification = "Manual entry",
                 referenceId = null,
-                fingerprint = fingerprint
+                fingerprint = fingerprint,
+                direction = direction,
+                classification = classification
             )
             repository.saveTransaction(txn)
         }
+    }
+
+    fun addManualExpense(
+        amount: Double,
+        merchant: String,
+        category: String,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        addManualTransaction(
+            amount = amount,
+            merchant = merchant,
+            category = category,
+            direction = TransactionDirection.DEBIT,
+            classification = TransactionClassification.EXPENSE,
+            timestamp = timestamp
+        )
     }
 
     fun importMonthSms(context: android.content.Context) {

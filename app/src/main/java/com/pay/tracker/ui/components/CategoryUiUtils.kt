@@ -11,11 +11,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -57,6 +61,10 @@ object CategoryUiUtils {
             "transfer", "transfers" -> Icons.Default.SwapHoriz
             "entertainment", "movies" -> Icons.Default.Movie
             "health", "medical" -> Icons.Default.LocalHospital
+            "salary", "work" -> Icons.Default.Savings
+            "income", "earnings" -> Icons.Default.Payment
+            "refund", "reversals" -> Icons.Default.History
+            "cashback", "rewards" -> Icons.Default.CheckCircle
             else -> Icons.Default.Category
         }
     }
@@ -71,6 +79,10 @@ object CategoryUiUtils {
             "transfer", "transfers" -> TransferColor
             "entertainment", "movies" -> EntertainmentColor
             "health", "medical" -> HealthColor
+            "salary", "work" -> Color(0xFF4CAF50)
+            "income", "earnings" -> Color(0xFF66BB6A)
+            "refund", "reversals" -> Color(0xFF26A69A)
+            "cashback", "rewards" -> Color(0xFFFFB74D)
             else -> OtherColor
         }
     }

@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 /**
  * Room entity for persisted transactions.
- * Indexed on referenceId and fingerprint for fast deduplication lookups.
+ * Indexed on referenceId, fingerprint, direction, classification, status, and timestamp.
  */
 @Entity(
     tableName = "transactions",
@@ -14,7 +14,9 @@ import androidx.room.PrimaryKey
         Index(value = ["fingerprint"], unique = true),
         Index(value = ["referenceId"]),
         Index(value = ["status"]),
-        Index(value = ["timestamp"])
+        Index(value = ["timestamp"]),
+        Index(value = ["direction"]),
+        Index(value = ["classification"])
     ]
 )
 data class TransactionEntity(
@@ -28,5 +30,8 @@ data class TransactionEntity(
     val status: String, // PENDING, CONFIRMED, REJECTED
     val rawNotification: String,
     val referenceId: String?,
-    val fingerprint: String
+    val fingerprint: String,
+    val direction: String = "DEBIT", // DEBIT, CREDIT
+    val classification: String = "EXPENSE", // INCOME, EXPENSE, REFUND, CASHBACK, TRANSFER
+    val originalExpenseId: Long? = null
 )

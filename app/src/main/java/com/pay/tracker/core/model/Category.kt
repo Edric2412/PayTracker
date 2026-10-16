@@ -89,7 +89,43 @@ data class Category(
             )
         )
 
-        val DEFAULT_CATEGORIES = listOf(
+        val SALARY = Category(
+            id = "salary",
+            name = "Salary",
+            iconName = "Work",
+            defaultKeywords = listOf(
+                "salary", "payroll", "stipend", "wages", "remuneration", "bonus", "corp salary"
+            )
+        )
+
+        val INCOME = Category(
+            id = "income",
+            name = "Income",
+            iconName = "Payments",
+            defaultKeywords = listOf(
+                "credited", "received", "dividend", "interest", "deposit", "profit"
+            )
+        )
+
+        val REFUND = Category(
+            id = "refund",
+            name = "Refund",
+            iconName = "Replay",
+            defaultKeywords = listOf(
+                "refund", "refunded", "reversal", "reversal of"
+            )
+        )
+
+        val CASHBACK = Category(
+            id = "cashback",
+            name = "Cashback",
+            iconName = "Redeem",
+            defaultKeywords = listOf(
+                "cashback", "reward", "rewards", "points credited"
+            )
+        )
+
+        val EXPENSE_CATEGORIES = listOf(
             FOOD,
             GROCERIES,
             SHOPPING,
@@ -98,6 +134,29 @@ data class Category(
             TRANSFER,
             ENTERTAINMENT,
             HEALTH
+        )
+
+        val INCOME_CATEGORIES = listOf(
+            SALARY,
+            INCOME,
+            REFUND,
+            CASHBACK,
+            TRANSFER
+        )
+
+        val DEFAULT_CATEGORIES = listOf(
+            FOOD,
+            GROCERIES,
+            SHOPPING,
+            TRAVEL,
+            BILLS,
+            TRANSFER,
+            ENTERTAINMENT,
+            HEALTH,
+            SALARY,
+            INCOME,
+            REFUND,
+            CASHBACK
         )
     }
 }

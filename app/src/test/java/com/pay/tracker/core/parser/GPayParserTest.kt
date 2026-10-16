@@ -648,11 +648,11 @@ class GPayParserTest {
     }
 
     // ==========================================
-    // REJECTION: CREDITS, BALANCES, PROMOS & TELCO DUPLICATES
+    // INCOMING CREDITS, SALARY, REFUNDS, CASHBACK
     // ==========================================
 
     @Test
-    fun parse_creditedSms_isRejected() {
+    fun parse_creditedSms_isParsedAsCredit() {
         val title = "AX-AXISBK-S"
         val text = """
             INR 100.00 credited
@@ -662,7 +662,82 @@ class GPayParserTest {
         """.trimIndent()
 
         val result = parser.parse(title, text)
-        assertNull("Credited money must be rejected", result)
+        assertNotNull("Credited money should be parsed as credit", result)
+        assertEquals(100.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        assertEquals("Aryan R", result.merchant)
+        assertEquals("664382560303", result.referenceId)
+    }
+
+    @Test
+    fun parse_salaryCredit_isIdentifiedAsSalary() {
+        val title = "HDFC Bank"
+        val text = "INR 85,000.00 credited to your A/c XX1234 on 01-Nov-26 towards Salary by Acme Corp. UPI Ref 382910291029"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(85000.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        assertEquals(com.pay.tracker.core.model.TransactionClassification.INCOME, result.classification)
+        val cat = suggester.suggestCategory(result.merchant, text, result.classification)
+        assertEquals("Salary", cat)
+    }
+
+    @Test
+    fun parse_p2pCredit_isReceivedMoney() {
+        val title = "Google Pay"
+        val text = "You received ₹1,500 from Vikram Patel. UPI Ref: 981273918237"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(1500.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        assertEquals(com.pay.tracker.core.model.TransactionClassification.INCOME, result.classification)
+        assertEquals("Vikram Patel", result.merchant)
+        val cat = suggester.suggestCategory(result.merchant, text, result.classification)
+        assertEquals("Income", cat)
+    }
+
+    @Test
+    fun parse_refund_isIdentifiedAsRefund() {
+        val title = "HDFC Bank"
+        val text = "Refund of INR 450.00 from Swiggy credited to your A/c XX1234. UPI Ref 827192837192"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(450.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        assertEquals(com.pay.tracker.core.model.TransactionClassification.REFUND, result.classification)
+        assertEquals("Swiggy", result.merchant)
+        val cat = suggester.suggestCategory(result.merchant, text, result.classification)
+        assertEquals("Food", cat)
+    }
+
+    @Test
+    fun parse_cashback_isIdentifiedAsCashback() {
+        val title = "Google Pay"
+        val text = "Cashback of ₹50 received from Google Pay Rewards"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(50.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        assertEquals(com.pay.tracker.core.model.TransactionClassification.CASHBACK, result.classification)
+        val cat = suggester.suggestCategory(result.merchant, text, result.classification)
+        assertEquals("Cashback", cat)
+    }
+
+    // ==========================================
+    // REJECTION: BALANCES, LOANS, PROMOS & TELCO DUPLICATES
+    // ==========================================
+
+    @Test
+    fun parse_loanOfferPromo_isRejected() {
+        val title = "Axis Bank"
+        val text = "Congratulations! Pre-approved personal loan of INR 5,00,000 available at 10.5% p.a. Apply now."
+
+        val result = parser.parse(title, text)
+        assertNull("Loan promo must be rejected", result)
     }
 
     @Test

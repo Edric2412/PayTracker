@@ -469,5 +469,227 @@ class GPayParserTest {
         assertEquals(500.0, result!!.amount, 0.001)
         assertTrue(result.merchant.isNotBlank())
     }
+
+    // ==========================================
+    // LEGITIMATE COMPLETED SUBSCRIPTION DEBITS
+    // ==========================================
+
+    @Test
+    fun parse_axisBankSubscriptionDebit_extractsGoogleCloudAndCorrectAmount() {
+        val title = "AD-AXISBK-S"
+        val text = "Your A/c has been debited towards Google Cloud for INR 2.00 on 09-10-26. adb9934c76e14b0bbcfa8ea711d5abca@okaxis - Axis Bank"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(2.00, result!!.amount, 0.001)
+        assertEquals("Google Cloud", result.merchant)
+        assertTrue(result.confidence >= 0.85f)
+    }
+
+    @Test
+    fun parse_completedNetflixAutoPayDebit_extractsCorrectDetails() {
+        val title = "HDFC Bank"
+        val text = "INR 199.00 debited from A/c XX1234 towards Netflix AutoPay on 15-10-26. UPI Ref 583920194820"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(199.00, result!!.amount, 0.001)
+        assertEquals("Netflix", result.merchant)
+        assertEquals("583920194820", result.referenceId)
+        assertTrue(result.confidence >= 0.85f)
+    }
+
+    @Test
+    fun parse_completedSpotifyAutoDebit_extractsCorrectDetails() {
+        val title = "Axis Bank"
+        val text = "INR 149.00 auto-debited from A/c XX1234 for Spotify subscription on 15-10-26"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(149.00, result!!.amount, 0.001)
+        assertEquals("Spotify", result.merchant)
+        assertTrue(result.confidence >= 0.85f)
+    }
+
+    @Test
+    fun parse_completedCardDebitWithOnMerchant_extractsCorrectDetails() {
+        val title = "VM-AXISBK-S"
+        val text = "INR 755.40 debited from A/c no. XX109270 on FLY IO 02-10-2026 05:18:50 IST. Avl bal: INR 341.21. Not you? SMS BLOCKCARD XX4738 to +919951860002 - Axis Bank"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(755.40, result!!.amount, 0.001)
+        assertEquals("FLY IO", result.merchant)
+        assertTrue(result.confidence >= 0.85f)
+    }
+
+    // ==========================================
+    // REJECTION: AUTOPAY MANDATES & SUBSCRIPTION LIFECYCLE
+    // ==========================================
+
+    @Test
+    fun parse_revokedUpiMandate_isRejected() {
+        val title = "AX-AXISBK-S"
+        val text = "Your UPI mandate has been successfully revoked towards Google Cloud for INR 15000.00 - Axis Bank"
+
+        val result = parser.parse(title, text)
+        assertNull("Mandate revocation must be rejected", result)
+    }
+
+    @Test
+    fun parse_revokedGooglePlayMandate_isRejected() {
+        val title = "AX-AXISBK-S"
+        val text = "Your UPI mandate has been successfully revoked towards Google Play for INR 99.00 - Axis Bank"
+
+        val result = parser.parse(title, text)
+        assertNull("Mandate revocation must be rejected", result)
+    }
+
+    @Test
+    fun parse_createdAspresentedMandate_isRejected() {
+        val title = "VM-AXISBK-S"
+        val text = "Your UPI ASPRESENTED mandate has been successfully created towards Google Cloud from 09-10-26 to 31-12-36 for INR 15000.00 - Axis Bank"
+
+        val result = parser.parse(title, text)
+        assertNull("Mandate creation must be rejected", result)
+    }
+
+    @Test
+    fun parse_autoPayMandateCancelled_isRejected() {
+        val title = "HDFC Bank"
+        val text = "AutoPay mandate of INR 499.00 for Netflix has been cancelled successfully."
+
+        val result = parser.parse(title, text)
+        assertNull("Cancelled mandate must be rejected", result)
+    }
+
+    @Test
+    fun parse_standingInstructionCreated_isRejected() {
+        val title = "ICICI Bank"
+        val text = "Standing instruction created for Rs 5000 towards SIP."
+
+        val result = parser.parse(title, text)
+        assertNull("Standing instruction creation must be rejected", result)
+    }
+
+    @Test
+    fun parse_emandateRegistered_isRejected() {
+        val title = "SBI"
+        val text = "E-mandate of INR 500.00 registered successfully for Hotstar."
+
+        val result = parser.parse(title, text)
+        assertNull("E-mandate registration must be rejected", result)
+    }
+
+    // ==========================================
+    // REJECTION: RENEWAL REMINDERS & UPCOMING PAYMENTS
+    // ==========================================
+
+    @Test
+    fun parse_subscriptionRenewalReminder_isRejected() {
+        val title = "Netflix"
+        val text = "Reminder: Your Netflix subscription of Rs. 649 is scheduled for auto-debit on 20-Oct-26."
+
+        val result = parser.parse(title, text)
+        assertNull("Subscription reminder must be rejected", result)
+    }
+
+    @Test
+    fun parse_upcomingAutoPayPaymentAlert_isRejected() {
+        val title = "Amazon Pay"
+        val text = "Upcoming payment alert: Rs 999 will be auto-debited towards Prime on 25-Oct."
+
+        val result = parser.parse(title, text)
+        assertNull("Upcoming auto-debit alert must be rejected", result)
+    }
+
+    @Test
+    fun parse_renewSubscriptionNotice_isRejected() {
+        val title = "Hotstar"
+        val text = "Renew your Hotstar subscription for Rs 499 to continue streaming."
+
+        val result = parser.parse(title, text)
+        assertNull("Promotional renewal notice must be rejected", result)
+    }
+
+    // ==========================================
+    // REJECTION: FAILED & REVERSED TRANSACTIONS
+    // ==========================================
+
+    @Test
+    fun parse_failedTransaction_isRejected() {
+        val title = "Google Pay"
+        val text = "Payment of Rs. 500 to Uber failed: Bank server timeout."
+
+        val result = parser.parse(title, text)
+        assertNull("Failed payment must be rejected", result)
+    }
+
+    @Test
+    fun parse_declinedTransaction_isRejected() {
+        val title = "HDFC Bank"
+        val text = "Transaction of INR 200 at Swiggy declined due to insufficient balance."
+
+        val result = parser.parse(title, text)
+        assertNull("Declined transaction must be rejected", result)
+    }
+
+    @Test
+    fun parse_reversedTransaction_isRejected() {
+        val title = "PhonePe"
+        val text = "UPI payment of Rs. 150 reversed. Amount will be credited back to your account."
+
+        val result = parser.parse(title, text)
+        assertNull("Reversed payment must be rejected", result)
+    }
+
+    // ==========================================
+    // REJECTION: CREDITS, BALANCES, PROMOS & TELCO DUPLICATES
+    // ==========================================
+
+    @Test
+    fun parse_creditedSms_isRejected() {
+        val title = "AX-AXISBK-S"
+        val text = """
+            INR 100.00 credited
+            A/c no. XX9270
+            04-10-26, 12:34:30 IST
+            UPI/P2A/664382560303/ARYAN R/SIBL/UPI - Axis Bank
+        """.trimIndent()
+
+        val result = parser.parse(title, text)
+        assertNull("Credited money must be rejected", result)
+    }
+
+    @Test
+    fun parse_balanceOnlyNotification_doesNotInferExpense() {
+        val title = "HDFC Bank"
+        val text = "Your account balance is INR 25,000.00. Avl limit: INR 50,000.00."
+
+        val result = parser.parse(title, text)
+        assertNull("Balance notification must not infer expense", result)
+    }
+
+    @Test
+    fun parse_telcoDuplicateRechargeSms_isRejected() {
+        val title = "Airtel-S"
+        val text = "Recharge of INR 22.00 is successful for your Airtel Mobile on 15-10-2026. Would you like to refer your friends and save Rs100 on next recharge?"
+
+        val result = parser.parse(title, text)
+        assertNull("Telco marketing recharge SMS must be rejected", result)
+    }
+
+    @Test
+    fun parse_billStatementNotice_isRejected() {
+        val title = "Axis Bank"
+        val text = "Your credit card bill of Rs 15,400 is generated. Minimum due is Rs 1,500 by 25-Oct."
+
+        val result = parser.parse(title, text)
+        assertNull("Bill generation notice must be rejected", result)
+    }
 }
 

@@ -75,6 +75,18 @@ class SettingsViewModel(
         }
     }
 
+    fun importAllHistoricalSms(context: Context) {
+        val repo = repository ?: return
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importState.value = null
+            val importer = SmsTransactionImporter(repo)
+            val result = importer.importAllSms(context)
+            _importState.value = result
+            _isImporting.value = false
+        }
+    }
+
     fun dismissImportResult() {
         _importState.value = null
     }

@@ -96,6 +96,12 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
+        // Pattern 13b: "debited ... on FLY IO 02-10-2026"
+        private val PATTERN_ON_MERCHANT = Pattern.compile(
+            """\bon\s+([A-Za-z0-9_.\- ]+?)\s+\d{1,2}[-/]\d{1,2}""",
+            Pattern.CASE_INSENSITIVE
+        )
+
         // Pattern 14: Bank SMS "debited ... to ZEPTO (UPI Ref ...)"
         private val PATTERN_TO_MERCHANT = Pattern.compile(
             """(?:debited|paid|sent)\s+.*?to\s+([^.,\n]+?)(?:\s+(?:UPI|txn|ref|rrn|Bal|Avl|\()\b|\s*\.|\s*$)""",
@@ -108,9 +114,32 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
-        // Pattern 16: Generic INR / Rs. / ₹ amount anywhere in text
-        private val PATTERN_GENERIC_AMOUNT = Pattern.compile(
-            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+        // Pattern 16: "debited towards Google Cloud for INR 2.00" or "debited for INR 499 towards Netflix"
+        private val PATTERN_DEBITED_TOWARDS = Pattern.compile(
+            """(?:debited\s+towards|debited\s+from\s+[^.,\n]+?\s+towards|debited\s+for)\s+([^.,\n]+?)\s+(?:for|of|with|[:\-])\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 17: "INR 149.00 auto-debited" or "auto-debited for INR 199.00"
+        private val PATTERN_AUTO_DEBITED = Pattern.compile(
+            """(?:auto-debited|auto\s+debited|automatically\s+debited)\s*(?:from\s+[^.,\n]+?)?\s*(?:for|of|with|by|[:\-])?\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        private val PATTERN_AMOUNT_AUTO_DEBITED = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has\s+been\s+|is\s+|was\s+)?(?:auto-debited|auto\s+debited|automatically\s+debited)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 17b: "Paid ₹120 using HDFC Bank account" or "Sent Rs 500"
+        private val PATTERN_PAID_AMOUNT = Pattern.compile(
+            """(?:paid|sent)\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 18: "for Spotify subscription on 15-10-26" or "for Netflix AutoPay"
+        private val PATTERN_FOR_MERCHANT = Pattern.compile(
+            """\bfor\s+(?!(?:INR|Rs\.?|₹)\b)([^.,\n]+?)(?:\s+(?:subscription|AutoPay|on\s+\d|avl|limit|bal|using|via)\b|\s*\.|\s*$)""",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -122,40 +151,104 @@ class GPayParser {
     }
 
     /**
-     * Checks if notification text represents a completed debit/payment.
-     * Rejects OTPs, cashbacks received, money requests, and failed transactions.
+     * Checks if notification text represents an actual, completed debit/payment.
+     * Rejects:
+     * - Mandate / AutoPay lifecycle management (creation, activation, cancellation, revocation, modification)
+     * - Subscription renewal reminders, scheduled payment alerts, upcoming auto-debit notices
+     * - Failed, declined, timed out, reversed, or pending authorization transactions
+     * - Credits, refunds, cashbacks, incoming transfers
+     * - OTPs, money requests, credit card bill/statement generation alerts
+     * - Telco recharge confirmations and promotional messages
+     *
+     * Requires explicit positive evidence of an actual completed debit.
      */
     fun isDebitNotification(title: String, text: String): Boolean {
         val combined = "$title $text".lowercase()
 
-        // Ignore OTP messages, money requests, or received money
-        val ignoreKeywords = listOf(
-            "otp", "verification code", "requested money", "request from",
-            "received ₹", "received rs", "received inr",
-            "has credited", "failed", "declined"
+        // 1. Mandatory exclusion: OTPs, verification codes, money requests
+        val requestOrSecurityKeywords = listOf(
+            "otp", "verification code", "security code", "one time password",
+            "requested money", "request from", "request for inr", "request for rs",
+            "has requested", "request received", "collect request"
         )
-        if (ignoreKeywords.any { combined.contains(it) }) {
+        if (requestOrSecurityKeywords.any { combined.contains(it) }) {
             return false
         }
 
-        val isCreditOnly = Regex("""(?:credited\s+to|credited\s+with)\s+(?:your\s+)?(?:a/c|acct|account)""").containsMatchIn(combined)
-        val debitKeywords = listOf(
-            "paid", "sent", "debited", "payment to", "payment of", "you paid", "spent",
-            "payment successful", "successful payment", "transferred", "auto-debited",
-            "debited from", "paid to", "sent to", "withdrawn", "txn", "transaction", "upi"
+        // 2. Mandatory exclusion: Failed, declined, cancelled, reversed, or timed out transactions
+        val failureOrReversalPatterns = listOf(
+            Regex("""\b(?:failed|declined|unsuccessful|reversed|reversal|bounced|rejected)\b"""),
+            Regex("""\b(?:payment|transaction|txn|transfer)\s+(?:failed|declined|unsuccessful|cancelled|canceled)\b"""),
+            Regex("""\b(?:unable\s+to\s+process|could\s+not\s+be\s+processed|timed\s+out|expired)\b""")
         )
-        val hasDebit = debitKeywords.any { combined.contains(it) }
-
-        if (isCreditOnly && !hasDebit) {
+        if (failureOrReversalPatterns.any { it.containsMatchIn(combined) }) {
             return false
         }
 
-        return hasDebit
+        // 3. Mandatory exclusion: Mandate / AutoPay / Standing Instruction lifecycle & subscription management
+        // (Creation, setup, revocation, cancellation, modification, renewal reminders, upcoming payment alerts)
+        val mandateLifecyclePatterns = listOf(
+            // "mandate has been successfully created/revoked", "mandate cancelled", "mandate registered"
+            Regex("""(?:mandate|e-mandate|emandate|standing\s+instruction|autopay)\s+.*?\b(?:created|revoked|cancelled|canceled|modified|registered|paused|scheduled|initiated|setup|set\s+up|deleted|expired)\b"""),
+            Regex("""\b(?:created|revoked|cancelled|canceled|modified|registered|paused|scheduled|setup|set\s+up)\b.*?\b(?:mandate|e-mandate|emandate|standing\s+instruction|autopay)\b"""),
+            // Specific terms like "aspresented mandate", "upi mandate has been", "autopay mandate created"
+            Regex("""(?:aspresented\s+mandate|upi\s+mandate\s+has\s+been|e-mandate\s+registered|autopay\s+mandate\b)"""),
+            // Subscription management / renewal reminders
+            Regex("""\b(?:subscription\s+created|subscription\s+cancelled|subscription\s+canceled|subscription\s+activated)\b"""),
+            Regex("""\b(?:renewal\s+reminder|renew\s+your\s+subscription|subscription\s+renewal|upcoming\s+(?:payment|debit|autopay))\b"""),
+            Regex("""\b(?:scheduled\s+for\s+(?:auto-debit|debit|payment)|scheduled\s+to\s+be\s+debited|due\s+for\s+auto-debit)\b"""),
+            Regex("""\b(?:mandate\s+request|autopay\s+request)\b""")
+        )
+        if (mandateLifecyclePatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 4. Mandatory exclusion: Credits, deposits, refunds, cashbacks (income / inward transfers)
+        val creditPatterns = listOf(
+            Regex("""\b(?:credited\s+to|credited\s+with|has\s+been\s+credited|is\s+credited|was\s+credited)\b"""),
+            Regex("""\b(?:refund|refunded|cashback\s+received|cashback\s+credited|amount\s+deposited)\b"""),
+            Regex("""\b(?:received\s+(?:inr|rs\.?|₹)?\s*[\d,]+|credited\s+(?:inr|rs\.?|₹)?\s*[\d,]+)\b"""),
+            Regex("""\b(?:credited\s+(?:for|on|in|towards)\b)"""),
+            Regex("""\bINR\s*[\d,]+(?:\.\d{1,2})?\s*credited\b""", RegexOption.IGNORE_CASE)
+        )
+        if (creditPatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 5. Mandatory exclusion: Bill generation & due notices (not an actual debit yet)
+        val billReminderPatterns = listOf(
+            Regex("""\b(?:bill\s+generated|statement\s+generated|payment\s+due|amount\s+due|minimum\s+due|total\s+due)\b"""),
+            Regex("""\b(?:bill\s+is\s+due|payment\s+is\s+due|bill\s+amount\s+is)\b""")
+        )
+        if (billReminderPatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 6. Mandatory exclusion: Telco duplicate recharge confirmations (bank debit SMS is already captured)
+        val telcoDuplicatePatterns = listOf(
+            Regex("""\b(?:recharge\s+of\s+(?:inr|rs\.?|₹)|prepaid\s+bill\s+payment\s+of)\b"""),
+            Regex("""\b(?:recharge\s+successful|recharge\s+of\s+rs\.?|recharge\s+of\s+inr)\b""")
+        )
+        if (telcoDuplicatePatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 7. Positive requirement: Must have explicit evidence of an actual completed debit/expense
+        val completedDebitPatterns = listOf(
+            Regex("""\b(?:has\s+been\s+|is\s+|was\s+)?debited\b"""),
+            Regex("""\b(?:auto-debited|auto\s+debited|automatically\s+debited)\b"""),
+            Regex("""\b(?:spent|spent\s+a\s+total\s+of)\b"""),
+            Regex("""\b(?:you\s+paid|paid\s+(?:inr|rs\.?|₹)?\s*[\d,]+|paid\s+to)\b"""),
+            Regex("""\b(?:payment\s+of\s+(?:inr|rs\.?|₹)?\s*[\d,]+|payment\s+to\s+[^.,\n]+?\s+of)\b"""),
+            Regex("""\b(?:sent\s+(?:inr|rs\.?|₹)?\s*[\d,]+|sent\s+to)\b"""),
+            Regex("""\b(?:withdrawn|withdrew)\b""")
+        )
+        return completedDebitPatterns.any { it.containsMatchIn(combined) }
     }
 
     /**
      * Parses notification title, text, and metadata into a [ParsedTransaction].
-     * Returns null if no valid payment pattern matches.
+     * Returns null if no valid payment pattern matches or if the message is not an actual completed debit.
      */
     fun parse(
         title: String,
@@ -178,12 +271,19 @@ class GPayParser {
         if (upiPathMatcher.find()) {
             referenceId = upiPathMatcher.group(1)
             merchant = cleanMerchant(upiPathMatcher.group(2))
-
-            // Look for amount in "INR 496.00 debited" / "debited INR 540.00" / "spent INR 850.00"
             amount = extractAmount(fullContent)
         }
 
-        // Strategy 2: Standard Google Pay notification patterns
+        // Strategy 2: "Debited towards <merchant> for INR <amount>" (e.g. Axis Bank subscription/mandate debits)
+        if (amount == null || merchant.isNullOrBlank()) {
+            val mDebTowards = PATTERN_DEBITED_TOWARDS.matcher(fullContent)
+            if (mDebTowards.find()) {
+                if (merchant.isNullOrBlank()) merchant = cleanMerchant(mDebTowards.group(1))
+                if (amount == null) amount = parseAmount(mDebTowards.group(2))
+            }
+        }
+
+        // Strategy 3: Standard Google Pay notification patterns
         if (amount == null || merchant.isNullOrBlank()) {
             val m1 = PATTERN_PAID_TO.matcher(fullContent)
             if (m1.find()) {
@@ -200,7 +300,7 @@ class GPayParser {
             }
         }
 
-        // Strategy 2b: "Paid to <merchant> ₹<amount>" / "Payment to <merchant> of ₹<amount>"
+        // Strategy 3b: "Paid to <merchant> ₹<amount>" / "Payment to <merchant> of ₹<amount>"
         if (amount == null || merchant.isNullOrBlank()) {
             val mPaidTo = PATTERN_PAID_TO_MERCHANT_AMOUNT.matcher(fullContent)
             if (mPaidTo.find()) {
@@ -225,7 +325,7 @@ class GPayParser {
             }
         }
 
-        // Strategy 3: Bank SMS recipient / merchant patterns (HDFC, SBI, ICICI, etc.)
+        // Strategy 4: Bank SMS recipient / merchant patterns (HDFC, SBI, ICICI, etc.)
         if (merchant.isNullOrBlank()) {
             val vpaMatcher = PATTERN_TO_VPA.matcher(fullContent)
             if (vpaMatcher.find()) {
@@ -255,32 +355,42 @@ class GPayParser {
         }
 
         if (merchant.isNullOrBlank()) {
+            val onMatcher = PATTERN_ON_MERCHANT.matcher(fullContent)
+            if (onMatcher.find()) {
+                merchant = cleanMerchant(onMatcher.group(1))
+            }
+        }
+
+        if (merchant.isNullOrBlank()) {
             val toMatcher = PATTERN_TO_MERCHANT.matcher(fullContent)
             if (toMatcher.find()) {
                 merchant = cleanMerchant(toMatcher.group(1))
             }
         }
 
-        // Strategy 4: Fallback amount extraction
-        if (amount == null) {
-            amount = extractAmount(fullContent)
-        }
-        if (amount == null) {
-            val genericAmtMatcher = PATTERN_GENERIC_AMOUNT.matcher(fullContent)
-            if (genericAmtMatcher.find()) {
-                amount = parseAmount(genericAmtMatcher.group(1))
+        if (merchant.isNullOrBlank()) {
+            val forMatcher = PATTERN_FOR_MERCHANT.matcher(fullContent)
+            if (forMatcher.find()) {
+                merchant = cleanMerchant(forMatcher.group(1))
             }
         }
 
+        // Strategy 5: Ensure amount is strictly extracted via completed debit/spent patterns
+        if (amount == null) {
+            amount = extractAmount(fullContent)
+        }
+
+        // NOTE: We deliberately DO NOT fall back to generic standalone amount patterns (like PATTERN_GENERIC_AMOUNT).
+        // This strictly prevents inferring expenses from account balances, credit limits, or promo numbers.
         if (amount == null || amount <= 0.0) {
             return null
         }
 
-        // Strategy 5: Fallback merchant extraction if title is merchant name
+        // Strategy 6: Fallback merchant extraction if title is merchant name
         if (merchant.isNullOrBlank()) {
             val genericTitles = setOf("google pay", "phonepe", "paytm", "cred", "bhim", "gpay", "payment", "bank", "upi", "messages", "sms", "alert")
             val cleanTitle = cleanMerchant(title)
-            val titleHasAmt = PATTERN_GENERIC_AMOUNT.matcher(title).find()
+            val titleHasAmt = Regex("""(?:INR|Rs\.?|₹)\s*[\d,]+""", RegexOption.IGNORE_CASE).containsMatchIn(title)
             if (!cleanTitle.isNullOrBlank() && !titleHasAmt && cleanTitle.lowercase() !in genericTitles) {
                 merchant = cleanTitle
             } else {
@@ -296,6 +406,16 @@ class GPayParser {
             }
         }
 
+        val hasExplicitMerchant = !merchant.isNullOrBlank() && merchant != "UPI Merchant"
+        val hasRefId = !referenceId.isNullOrBlank()
+
+        val confidence = when {
+            hasRefId && hasExplicitMerchant -> 0.98f
+            hasExplicitMerchant -> 0.90f
+            hasRefId -> 0.85f
+            else -> 0.70f // Uncertain merchant without ref ID
+        }
+
         val fingerprint = generateFingerprint(amount, merchant, postTime, referenceId)
 
         return ParsedTransaction(
@@ -306,7 +426,7 @@ class GPayParser {
             sourceApp = packageName,
             rawNotification = fullContent.trim(),
             fingerprint = fingerprint,
-            confidence = if (referenceId != null) 0.98f else 0.85f
+            confidence = confidence
         )
     }
 
@@ -317,9 +437,33 @@ class GPayParser {
             if (amt != null && amt > 0.0) return amt
         }
 
+        val mAuto1 = PATTERN_AMOUNT_AUTO_DEBITED.matcher(content)
+        if (mAuto1.find()) {
+            val amt = parseAmount(mAuto1.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
         val m2 = PATTERN_DEBITED_AMOUNT.matcher(content)
         if (m2.find()) {
             val amt = parseAmount(m2.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mAuto2 = PATTERN_AUTO_DEBITED.matcher(content)
+        if (mAuto2.find()) {
+            val amt = parseAmount(mAuto2.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mDebTowards = PATTERN_DEBITED_TOWARDS.matcher(content)
+        if (mDebTowards.find()) {
+            val amt = parseAmount(mDebTowards.group(2))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mPaid = PATTERN_PAID_AMOUNT.matcher(content)
+        if (mPaid.find()) {
+            val amt = parseAmount(mPaid.group(1))
             if (amt != null && amt > 0.0) return amt
         }
 
@@ -351,6 +495,11 @@ class GPayParser {
     private fun cleanMerchant(rawMerchant: String?): String? {
         if (rawMerchant == null) return null
         var cleaned = rawMerchant.trim()
+
+        // Ignore if merchant is a customer service number or SMS block instructions
+        if (cleaned.startsWith("+91") || cleaned.matches(Regex("""^\+?\d{8,15}.*""")) || cleaned.contains("BLOCK", ignoreCase = true)) {
+            return null
+        }
 
         // 1. Remove VPA prefix if present (e.g. "VPA swiggy@icici" -> "swiggy@icici")
         cleaned = cleaned.replace(Regex("""^VPA\s+""", RegexOption.IGNORE_CASE), "")

@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -108,13 +109,21 @@ fun SettingsScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            viewModel.importThisMonthSms(context)
+            viewModel.importAllHistoricalSms(context)
         }
     }
 
     val onScanSmsClick = {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
             viewModel.importThisMonthSms(context)
+        } else {
+            smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
+        }
+    }
+
+    val onScanAllSmsClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
+            viewModel.importAllHistoricalSms(context)
         } else {
             smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
         }
@@ -392,22 +401,30 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Scan This Month's SMS",
+                                    text = "SMS Transaction Import",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Parse bank & UPI debit messages from the 1st of this month.",
+                                    text = "Scan bank & UPI debit SMS to populate monthly spending across all years.",
                                     fontSize = 12.sp,
                                     color = BotanicalTextSecondary
                                 )
                             }
                         }
 
+                        BotanicalCreamButton(
+                            text = if (isImporting) "Scanning All Historical SMS..." else "Scan All History (All Months & Years)",
+                            onClick = onScanAllSmsClick,
+                            icon = Icons.Default.History,
+                            enabled = !isImporting,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         BotanicalGlassButton(
-                            text = if (isImporting) "Scanning Messages..." else "Run SMS Scan",
+                            text = if (isImporting) "Scanning..." else "Scan Current Month Only",
                             onClick = onScanSmsClick,
                             icon = Icons.Default.Download,
                             enabled = !isImporting,
@@ -627,7 +644,7 @@ fun SettingsScreen(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "Imported ${result.importedCount} transactions from this month.",
+                            text = "Imported ${result.importedCount} transactions.",
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
                         )

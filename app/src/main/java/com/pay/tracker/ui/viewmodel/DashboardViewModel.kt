@@ -48,6 +48,100 @@ data class BudgetPacing(
     val isExceeded: Boolean = false
 )
 
+data class YearMonthSelection(
+    val year: Int,
+    val month: Int // 1..12
+) {
+    val displayName: String
+        get() {
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, 1)
+            }
+            return java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(cal.time)
+        }
+
+    val isCurrentMonth: Boolean
+        get() {
+            val now = Calendar.getInstance()
+            return now.get(Calendar.YEAR) == year && (now.get(Calendar.MONTH) + 1) == month
+        }
+
+    fun startEpoch(): Long {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return cal.timeInMillis
+    }
+
+    fun endEpoch(): Long {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1)
+            val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+            set(Calendar.DAY_OF_MONTH, maxDay)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }
+        return cal.timeInMillis
+    }
+
+    fun totalDays(): Int {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        return cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    }
+
+    fun previous(): YearMonthSelection {
+        return if (month == 1) YearMonthSelection(year - 1, 12)
+        else YearMonthSelection(year, month - 1)
+    }
+
+    fun next(): YearMonthSelection {
+        return if (month == 12) YearMonthSelection(year + 1, 1)
+        else YearMonthSelection(year, month + 1)
+    }
+
+    companion object {
+        fun current(): YearMonthSelection {
+            val now = Calendar.getInstance()
+            return YearMonthSelection(
+                year = now.get(Calendar.YEAR),
+                month = now.get(Calendar.MONTH) + 1
+            )
+        }
+    }
+}
+
+data class MonthlySpendSummary(
+    val year: Int,
+    val month: Int, // 1..12
+    val monthName: String,
+    val displayName: String,
+    val totalAmount: Double,
+    val transactionCount: Int,
+    val isCurrentMonth: Boolean
+)
+
+data class YearlySpendSummary(
+    val year: Int,
+    val totalAmount: Double,
+    val transactionCount: Int,
+    val months: List<MonthlySpendSummary>
+)
+
 data class TimeframeSummary(
     val timeframe: DashboardTimeframe = DashboardTimeframe.THIS_MONTH,
     val totalSpend: Double = 0.0,
@@ -88,31 +182,149 @@ class DashboardViewModel(
         _selectedTimeframe.value = timeframe
     }
 
-    private val startOfMonthEpoch: Long
-        get() {
-            val calendar = Calendar.getInstance().apply {
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            return calendar.timeInMillis
+    private val _selectedYearMonth = MutableStateFlow(YearMonthSelection.current())
+    val selectedYearMonth: StateFlow<YearMonthSelection> = _selectedYearMonth.asStateFlow()
+
+    fun previousMonth() {
+        _selectedYearMonth.value = _selectedYearMonth.value.previous()
+    }
+
+    fun nextMonth() {
+        _selectedYearMonth.value = _selectedYearMonth.value.next()
+    }
+
+    fun selectYearMonth(ym: YearMonthSelection) {
+        _selectedYearMonth.value = ym
+    }
+
+    fun jumpToCurrentMonth() {
+        _selectedYearMonth.value = YearMonthSelection.current()
+    }
+
+    val availableMonths: StateFlow<List<YearMonthSelection>> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { currentYm, txns ->
+        val set = mutableSetOf<YearMonthSelection>()
+        set.add(YearMonthSelection.current())
+        set.add(currentYm)
+        txns.forEach { txn ->
+            val cal = Calendar.getInstance().apply { timeInMillis = txn.timestamp }
+            set.add(YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1))
         }
+        set.sortedWith(compareByDescending<YearMonthSelection> { it.year }.thenByDescending { it.month })
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = listOf(YearMonthSelection.current())
+    )
+
+    val previousMonthTotal: StateFlow<Double> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, txns ->
+        val prev = ym.previous()
+        txns.filter { it.timestamp in prev.startEpoch()..prev.endEpoch() }.sumOf { it.amount }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
+
+    val yearlySpendSummaries: StateFlow<List<YearlySpendSummary>> = repository.observeConfirmedTransactions()
+        .map { txns ->
+            val cal = Calendar.getInstance()
+            val now = Calendar.getInstance()
+            val currentYear = now.get(Calendar.YEAR)
+            val currentMonth = now.get(Calendar.MONTH) + 1
+            val monthFormat = java.text.SimpleDateFormat("MMMM", java.util.Locale.getDefault())
+
+            val yearGroups = txns.groupBy { txn ->
+                cal.timeInMillis = txn.timestamp
+                cal.get(Calendar.YEAR)
+            }
+
+            val allYears = (yearGroups.keys + currentYear).distinct().sortedDescending()
+
+            allYears.map { year ->
+                val yearTxns = yearGroups[year] ?: emptyList()
+                val monthGroups = yearTxns.groupBy { txn ->
+                    cal.timeInMillis = txn.timestamp
+                    cal.get(Calendar.MONTH) + 1
+                }
+
+                val activeMonths = if (year == currentYear) {
+                    (monthGroups.keys + currentMonth).distinct().sortedDescending()
+                } else {
+                    monthGroups.keys.sortedDescending()
+                }
+
+                val monthSummaries = activeMonths.map { month ->
+                    val monthTxns = monthGroups[month] ?: emptyList()
+                    val monthCal = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month - 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                    }
+                    val mName = monthFormat.format(monthCal.time)
+
+                    MonthlySpendSummary(
+                        year = year,
+                        month = month,
+                        monthName = mName,
+                        displayName = "$mName $year",
+                        totalAmount = monthTxns.sumOf { it.amount },
+                        transactionCount = monthTxns.size,
+                        isCurrentMonth = (year == currentYear && month == currentMonth)
+                    )
+                }
+
+                YearlySpendSummary(
+                    year = year,
+                    totalAmount = yearTxns.sumOf { it.amount },
+                    transactionCount = yearTxns.size,
+                    months = monthSummaries
+                )
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val monthlySpendMap: StateFlow<Map<YearMonthSelection, Double>> = repository.observeConfirmedTransactions()
+        .map { txns ->
+            val cal = Calendar.getInstance()
+            val map = mutableMapOf<YearMonthSelection, Double>()
+            txns.forEach { txn ->
+                cal.timeInMillis = txn.timestamp
+                val ym = YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+                map[ym] = (map[ym] ?: 0.0) + txn.amount
+            }
+            map
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyMap()
+        )
 
     val budgetPacing: StateFlow<BudgetPacing> = combine(
         budgetTarget,
+        selectedYearMonth,
         repository.observeConfirmedTransactions()
-    ) { target, txns ->
-        val cal = Calendar.getInstance()
-        val totalDaysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
-        val daysRemaining = (totalDaysInMonth - currentDay + 1).coerceAtLeast(1)
+    ) { target, ym, txns ->
+        val now = Calendar.getInstance()
+        val totalDaysInMonth = ym.totalDays()
+        val isCurrent = ym.isCurrentMonth
+        val currentDay = if (isCurrent) now.get(Calendar.DAY_OF_MONTH) else totalDaysInMonth
+        val daysRemaining = if (isCurrent) (totalDaysInMonth - currentDay + 1).coerceAtLeast(1) else 1
 
-        val monthTxns = txns.filter { it.timestamp >= startOfMonthEpoch }
+        val monthTxns = txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
         val spent = monthTxns.sumOf { it.amount }
         val remaining = (target - spent).coerceAtLeast(0.0)
-        val safeDaily = remaining / daysRemaining
+        val safeDaily = if (isCurrent) remaining / daysRemaining else 0.0
         val percent = if (target > 0) ((spent / target) * 100).toFloat() else 0f
         val isExceeded = spent > target
 
@@ -219,12 +431,16 @@ class DashboardViewModel(
         initialValue = TimeframeSummary()
     )
 
-    val monthlyTotal: StateFlow<Double> = repository.observeTotalSpentSince(startOfMonthEpoch)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0.0
-        )
+    val monthlyTotal: StateFlow<Double> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, txns ->
+        txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }.sumOf { it.amount }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
 
     val pendingTransactions: StateFlow<List<Transaction>> = repository.observePendingTransactions()
         .stateIn(
@@ -233,38 +449,42 @@ class DashboardViewModel(
             initialValue = emptyList()
         )
 
-    val confirmedTransactionsCount: StateFlow<Int> = repository.observeConfirmedTransactions()
-        .map { list -> list.count { it.timestamp >= startOfMonthEpoch } }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0
-        )
+    val confirmedTransactionsCount: StateFlow<Int> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, list ->
+        list.count { it.timestamp in ym.startEpoch()..ym.endEpoch() }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0
+    )
 
-    val categoryBreakdown: StateFlow<List<CategoryExpense>> = repository.observeConfirmedTransactions()
-        .map { transactions ->
-            val monthTransactions = transactions.filter { it.timestamp >= startOfMonthEpoch }
-            val total = monthTransactions.sumOf { it.amount }
-            if (total == 0.0) {
-                emptyList()
-            } else {
-                monthTransactions.groupBy { it.category }
-                    .map { (cat, list) ->
-                        val sum = list.sumOf { it.amount }
-                        CategoryExpense(
-                            category = cat,
-                            totalAmount = sum,
-                            percentage = ((sum / total) * 100).toFloat()
-                        )
-                    }
-                    .sortedByDescending { it.totalAmount }
-            }
+    val categoryBreakdown: StateFlow<List<CategoryExpense>> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, transactions ->
+        val monthTransactions = transactions.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
+        val total = monthTransactions.sumOf { it.amount }
+        if (total == 0.0) {
+            emptyList()
+        } else {
+            monthTransactions.groupBy { it.category }
+                .map { (cat, list) ->
+                    val sum = list.sumOf { it.amount }
+                    CategoryExpense(
+                        category = cat,
+                        totalAmount = sum,
+                        percentage = ((sum / total) * 100).toFloat()
+                    )
+                }
+                .sortedByDescending { it.totalAmount }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     val dailySpendHistory: StateFlow<List<DailySpend>> = repository.observeConfirmedTransactions()
         .map { transactions ->
@@ -304,47 +524,50 @@ class DashboardViewModel(
             initialValue = emptyList()
         )
 
-    val monthDailySpendHistory: StateFlow<List<DailySpend>> = repository.observeConfirmedTransactions()
-        .map { transactions ->
-            val result = mutableListOf<DailySpend>()
-            val cal = Calendar.getInstance()
-            val totalDays = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-            val currentDay = cal.get(Calendar.DAY_OF_MONTH)
-            val monthTxns = transactions.filter { it.timestamp >= startOfMonthEpoch }
+    val monthDailySpendHistory: StateFlow<List<DailySpend>> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, transactions ->
+        val result = mutableListOf<DailySpend>()
+        val totalDays = ym.totalDays()
+        val now = Calendar.getInstance()
+        val isCurrent = ym.isCurrentMonth
+        val currentDay = if (isCurrent) now.get(Calendar.DAY_OF_MONTH) else totalDays
+        val monthTxns = transactions.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
 
-            for (day in 1..totalDays) {
-                val dayCal = Calendar.getInstance().apply {
-                    set(Calendar.DAY_OF_MONTH, day)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }
-                val startOfDay = dayCal.timeInMillis
-                val endOfDay = startOfDay + 86_400_000L - 1L
-
-                val dayTotal = if (day <= currentDay) {
-                    monthTxns.filter { it.timestamp in startOfDay..endOfDay }.sumOf { it.amount }
-                } else 0.0
-
-                result.add(
-                    DailySpend(
-                        dayLabel = day.toString(),
-                        dateText = "$day",
-                        totalAmount = dayTotal,
-                        isToday = (day == currentDay),
-                        timestamp = startOfDay
-                    )
-                )
+        for (day in 1..totalDays) {
+            val dayCal = Calendar.getInstance().apply {
+                set(Calendar.YEAR, ym.year)
+                set(Calendar.MONTH, ym.month - 1)
+                set(Calendar.DAY_OF_MONTH, day)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }
-            result
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+            val startOfDay = dayCal.timeInMillis
+            val endOfDay = startOfDay + 86_400_000L - 1L
 
+            val dayTotal = if (!isCurrent || day <= currentDay) {
+                monthTxns.filter { it.timestamp in startOfDay..endOfDay }.sumOf { it.amount }
+            } else 0.0
+
+            result.add(
+                DailySpend(
+                    dayLabel = day.toString(),
+                    dateText = "$day",
+                    totalAmount = dayTotal,
+                    isToday = isCurrent && (day == currentDay),
+                    timestamp = startOfDay
+                )
+            )
+        }
+        result
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     val sevenDayTotal: StateFlow<Double> = dailySpendHistory
         .map { list -> list.sumOf { it.totalAmount } }
@@ -354,28 +577,35 @@ class DashboardViewModel(
             initialValue = 0.0
         )
 
-    val monthDailyAverage: StateFlow<Double> = repository.observeConfirmedTransactions()
-        .map { txns ->
-            val monthTxns = txns.filter { it.timestamp >= startOfMonthEpoch }
-            val total = monthTxns.sumOf { it.amount }
-            val currentDayOfMonth = Calendar.getInstance().get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
-            total / currentDayOfMonth
+    val monthDailyAverage: StateFlow<Double> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, txns ->
+        val monthTxns = txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }
+        val total = monthTxns.sumOf { it.amount }
+        val now = Calendar.getInstance()
+        val effectiveDays = if (ym.isCurrentMonth) {
+            now.get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
+        } else {
+            ym.totalDays().coerceAtLeast(1)
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0.0
-        )
+        total / effectiveDays
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0.0
+    )
 
-    val largestExpenseThisMonth: StateFlow<Transaction?> = repository.observeConfirmedTransactions()
-        .map { txns ->
-            txns.filter { it.timestamp >= startOfMonthEpoch }.maxByOrNull { it.amount }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    val largestExpenseThisMonth: StateFlow<Transaction?> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, txns ->
+        txns.filter { it.timestamp in ym.startEpoch()..ym.endEpoch() }.maxByOrNull { it.amount }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
 
     val recentTransactions: StateFlow<List<Transaction>> = repository.observeAllTransactions()
         .map { list -> list.take(6) }
@@ -423,6 +653,23 @@ class DashboardViewModel(
             val result = importer.importMonthSms(context)
             _importState.value = result
             _isImporting.value = false
+        }
+    }
+
+    fun importAllSms(context: android.content.Context) {
+        viewModelScope.launch {
+            _isImporting.value = true
+            _importState.value = null
+            val importer = com.pay.tracker.core.sms.SmsTransactionImporter(repository)
+            val result = importer.importAllSms(context)
+            _importState.value = result
+            _isImporting.value = false
+        }
+    }
+
+    fun clearAllTransactions() {
+        viewModelScope.launch {
+            repository.clearAllTransactions()
         }
     }
 

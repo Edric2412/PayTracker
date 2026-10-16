@@ -29,30 +29,49 @@ class PaymentNotificationListenerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "PaymentNotificationSvc"
-        val ALLOWED_PACKAGES = setOf(
+        val KNOWN_FINANCE_PACKAGES = setOf(
             GPayParser.GPAY_PACKAGE,                 // Google Pay India ("com.google.android.apps.nbu.paisa.user")
-            "com.google.android.apps.messaging",     // Google Messages (Default Nothing Phone SMS)
-            "com.android.mms",                       // Standard Android SMS
-            "com.axis.mobile",                       // Axis Bank app
+            "com.google.android.apps.walletnfcrel",  // Google Wallet
+            "com.google.android.apps.messaging",     // Google Messages
+            "com.android.mms",                       // Android SMS
+            "com.samsung.android.messaging",         // Samsung SMS
+            "com.oneplus.mms",                       // OnePlus SMS
+            "com.coloros.mms",                       // Oppo SMS
             "com.phonepe.app",                       // PhonePe
             "net.one97.paytm",                       // Paytm
             "in.org.npci.upiapp",                    // BHIM UPI
             "com.dreamplug.androidapp",              // CRED
+            "com.amazon.mShop.android.shopping",     // Amazon Pay
+            "in.amazon.mShop.android.shopping",      // Amazon Pay IN
+            "com.whatsapp",                          // WhatsApp Pay
+            "money.jupiter",                         // Jupiter
+            "com.epifi.mobile",                      // Fi Money
+            "org.cosmic.slice",                      // Slice
+            "com.navi.finance",                      // Navi
+            "com.tatadigital.tcp",                   // Tata Neu
+            "com.axis.mobile",                       // Axis Bank
             "com.snapwork.sdfc",                     // HDFC Bank MobileBanking
             "com.snapwork.hdfc",                     // HDFC Bank MobileBanking (Alt)
             "com.csam.icici.bank.imobile",           // ICICI iMobile
-            "com.sbi.lotusintouch"                   // SBI YONO
+            "com.sbi.lotusintouch",                  // SBI YONO
+            "com.sbi.upi",                           // BHIM SBI Pay
+            "com.msf.kbank.mobile",                  // Kotak Bank
+            "com.bankofbaroda.mconnect",             // BOB World
+            "com.canarabank.mobility",               // Canara Bank
+            "com.idfcfirstbank.optimus",             // IDFC FIRST Bank
+            "com.indusind.mobile"                    // IndusInd Bank
         )
+        val ALLOWED_PACKAGES = KNOWN_FINANCE_PACKAGES
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        Log.i(TAG, "PaymentNotificationListenerService successfully connected and active.")
+        Log.i(TAG, "✓ PaymentNotificationListenerService successfully connected and actively listening for notifications.")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        Log.w(TAG, "PaymentNotificationListenerService disconnected. Requesting rebind...")
+        Log.w(TAG, "⚠ PaymentNotificationListenerService disconnected. Requesting rebind...")
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             requestRebind(android.content.ComponentName(this, PaymentNotificationListenerService::class.java))
         }
@@ -63,8 +82,9 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         if (sbn == null) return
 
         val packageName = sbn.packageName ?: return
-        if (packageName !in ALLOWED_PACKAGES) {
-            // Ignore notifications from unrelated apps
+
+        // Never process Pay Tracker's own notifications
+        if (packageName == applicationContext.packageName) {
             return
         }
 
@@ -81,7 +101,22 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             else -> subText
         }
 
-        Log.d(TAG, "Payment notification received from $packageName: title='$title', body='$body'")
+        val isKnownApp = packageName in KNOWN_FINANCE_PACKAGES ||
+            packageName.contains("pay") ||
+            packageName.contains("upi") ||
+            packageName.contains("bank") ||
+            packageName.contains("sms") ||
+            packageName.contains("mms") ||
+            packageName.contains("messaging") ||
+            packageName.contains("wallet")
+
+        val isDebit = gPayParser.isDebitNotification(title, body)
+
+        if (!isKnownApp && !isDebit) {
+            return
+        }
+
+        Log.i(TAG, "Notification received from $packageName: title='$title', body='$body'")
 
         val parsed = gPayParser.parse(
             title = title,
@@ -89,7 +124,7 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             postTime = sbn.postTime,
             packageName = packageName
         ) ?: run {
-            Log.d(TAG, "Notification did not match debit payment pattern.")
+            Log.d(TAG, "Notification from $packageName did not match debit payment pattern.")
             return
         }
 

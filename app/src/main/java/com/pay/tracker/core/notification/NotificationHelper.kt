@@ -145,11 +145,14 @@ object NotificationHelper {
             .build()
 
         try {
-            NotificationManagerCompat.from(context).notify(transactionId.toInt(), notification)
-            android.util.Log.d(TAG, "Posted expense heads-up notification for transaction ID: $transactionId")
+            val notificationManager = NotificationManagerCompat.from(context)
+            if (!notificationManager.areNotificationsEnabled()) {
+                android.util.Log.e(TAG, "❌ CANNOT POST NOTIFICATION: App notifications are turned OFF in system settings!")
+            }
+            notificationManager.notify(transactionId.toInt(), notification)
+            android.util.Log.i(TAG, "✓ Successfully posted expense heads-up notification for transaction ID: $transactionId (₹$formattedAmount at $merchant)")
         } catch (e: SecurityException) {
-            // Handled when POST_NOTIFICATIONS is not yet granted
-            android.util.Log.w(TAG, "SecurityException: POST_NOTIFICATIONS permission not granted yet.", e)
+            android.util.Log.e(TAG, "❌ SecurityException: POST_NOTIFICATIONS permission not granted.", e)
         }
     }
 

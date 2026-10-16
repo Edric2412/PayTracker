@@ -102,6 +102,18 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
+        // Pattern 15: "Paid to Starbucks ₹150" or "Sent to Rahul: Rs. 500" or "Payment to Swiggy of ₹350"
+        private val PATTERN_PAID_TO_MERCHANT_AMOUNT = Pattern.compile(
+            """(?:paid|sent|payment)\s+(?:of\s+)?to\s+([^.,\n:]+?)\s*(?:of|for|with|[:\-])?\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 16: Generic INR / Rs. / ₹ amount anywhere in text
+        private val PATTERN_GENERIC_AMOUNT = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
         // UPI Reference ID pattern: "UPI Ref: 123456789012" or "UPI Ref No 123456789012" or "Ref No 123456789012"
         private val PATTERN_UPI_REF = Pattern.compile(
             """(?:upi\s*ref(?:erence)?(?:\s*no\.?)?|ref\s*no\.?|\bref\b|txn\s*id|upi\s*txn(?:\s*id)?|rrn)\s*[:\-]?\s*([A-Za-z0-9]{6,})""",
@@ -128,7 +140,9 @@ class GPayParser {
 
         val isCreditOnly = Regex("""(?:credited\s+to|credited\s+with)\s+(?:your\s+)?(?:a/c|acct|account)""").containsMatchIn(combined)
         val debitKeywords = listOf(
-            "paid", "sent", "debited", "payment to", "payment of", "you paid", "spent"
+            "paid", "sent", "debited", "payment to", "payment of", "you paid", "spent",
+            "payment successful", "successful payment", "transferred", "auto-debited",
+            "debited from", "paid to", "sent to", "withdrawn", "txn", "transaction", "upi"
         )
         val hasDebit = debitKeywords.any { combined.contains(it) }
 
@@ -186,6 +200,15 @@ class GPayParser {
             }
         }
 
+        // Strategy 2b: "Paid to <merchant> ₹<amount>" / "Payment to <merchant> of ₹<amount>"
+        if (amount == null || merchant.isNullOrBlank()) {
+            val mPaidTo = PATTERN_PAID_TO_MERCHANT_AMOUNT.matcher(fullContent)
+            if (mPaidTo.find()) {
+                if (merchant.isNullOrBlank()) merchant = cleanMerchant(mPaidTo.group(1))
+                if (amount == null) amount = parseAmount(mPaidTo.group(2))
+            }
+        }
+
         if (amount == null || merchant.isNullOrBlank()) {
             val m3 = PATTERN_PAYMENT_OF.matcher(fullContent)
             if (m3.find()) {
@@ -238,13 +261,31 @@ class GPayParser {
             }
         }
 
-        // Strategy 4: Fallback amount extraction if merchant was found but amount is still null
+        // Strategy 4: Fallback amount extraction
         if (amount == null) {
             amount = extractAmount(fullContent)
         }
+        if (amount == null) {
+            val genericAmtMatcher = PATTERN_GENERIC_AMOUNT.matcher(fullContent)
+            if (genericAmtMatcher.find()) {
+                amount = parseAmount(genericAmtMatcher.group(1))
+            }
+        }
 
-        if (amount == null || amount <= 0.0 || merchant.isNullOrBlank()) {
+        if (amount == null || amount <= 0.0) {
             return null
+        }
+
+        // Strategy 5: Fallback merchant extraction if title is merchant name
+        if (merchant.isNullOrBlank()) {
+            val genericTitles = setOf("google pay", "phonepe", "paytm", "cred", "bhim", "gpay", "payment", "bank", "upi", "messages", "sms", "alert")
+            val cleanTitle = cleanMerchant(title)
+            val titleHasAmt = PATTERN_GENERIC_AMOUNT.matcher(title).find()
+            if (!cleanTitle.isNullOrBlank() && !titleHasAmt && cleanTitle.lowercase() !in genericTitles) {
+                merchant = cleanTitle
+            } else {
+                merchant = "UPI Merchant"
+            }
         }
 
         // Extract UPI reference if not yet extracted

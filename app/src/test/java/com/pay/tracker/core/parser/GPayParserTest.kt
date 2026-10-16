@@ -433,4 +433,41 @@ class GPayParserTest {
         val category = suggester.suggestCategory(result.merchant, result.rawNotification)
         assertEquals("Food", category)
     }
+
+    @Test
+    fun parse_paidToMerchantAmount_extractsCorrectDetails() {
+        val title = "PhonePe"
+        val text = "Paid to Starbucks ₹150"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(150.0, result!!.amount, 0.001)
+        assertEquals("Starbucks", result.merchant)
+    }
+
+    @Test
+    fun parse_titleAsMerchant_extractsCorrectDetails() {
+        val title = "Chai Point"
+        val text = "Paid ₹120 using HDFC Bank account"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(120.0, result!!.amount, 0.001)
+        assertEquals("Chai Point", result.merchant)
+    }
+
+    @Test
+    fun parse_bankDebitWithFallbackMerchant_extractsAmount() {
+        val title = "SBI"
+        val text = "Your account was debited by Rs.500.00 on 16-10-2026. Avl Bal Rs. 10,230"
+
+        val result = parser.parse(title, text)
+
+        assertNotNull(result)
+        assertEquals(500.0, result!!.amount, 0.001)
+        assertTrue(result.merchant.isNotBlank())
+    }
 }
+

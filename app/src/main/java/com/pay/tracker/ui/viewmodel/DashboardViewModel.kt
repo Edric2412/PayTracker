@@ -190,11 +190,18 @@ class DashboardViewModel(
     }
 
     fun nextMonth() {
-        _selectedYearMonth.value = _selectedYearMonth.value.next()
+        val cur = YearMonthSelection.current()
+        val currentSelected = _selectedYearMonth.value
+        if (currentSelected.year < cur.year || (currentSelected.year == cur.year && currentSelected.month < cur.month)) {
+            _selectedYearMonth.value = currentSelected.next()
+        }
     }
 
     fun selectYearMonth(ym: YearMonthSelection) {
-        _selectedYearMonth.value = ym
+        val cur = YearMonthSelection.current()
+        if (ym.year < cur.year || (ym.year == cur.year && ym.month <= cur.month)) {
+            _selectedYearMonth.value = ym
+        }
     }
 
     fun jumpToCurrentMonth() {
@@ -205,12 +212,18 @@ class DashboardViewModel(
         selectedYearMonth,
         repository.observeConfirmedTransactions()
     ) { currentYm, txns ->
+        val cur = YearMonthSelection.current()
         val set = mutableSetOf<YearMonthSelection>()
-        set.add(YearMonthSelection.current())
-        set.add(currentYm)
+        set.add(cur)
+        if (currentYm.year < cur.year || (currentYm.year == cur.year && currentYm.month <= cur.month)) {
+            set.add(currentYm)
+        }
         txns.forEach { txn ->
             val cal = Calendar.getInstance().apply { timeInMillis = txn.timestamp }
-            set.add(YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1))
+            val ym = YearMonthSelection(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+            if (ym.year < cur.year || (ym.year == cur.year && ym.month <= cur.month)) {
+                set.add(ym)
+            }
         }
         set.sortedWith(compareByDescending<YearMonthSelection> { it.year }.thenByDescending { it.month })
     }.stateIn(
@@ -244,7 +257,7 @@ class DashboardViewModel(
                 cal.get(Calendar.YEAR)
             }
 
-            val allYears = (yearGroups.keys + currentYear).distinct().sortedDescending()
+            val allYears = (yearGroups.keys + currentYear).distinct().filter { it <= currentYear }.sortedDescending()
 
             allYears.map { year ->
                 val yearTxns = yearGroups[year] ?: emptyList()
@@ -254,7 +267,7 @@ class DashboardViewModel(
                 }
 
                 val activeMonths = if (year == currentYear) {
-                    (monthGroups.keys + currentMonth).distinct().sortedDescending()
+                    (monthGroups.keys + currentMonth).distinct().filter { it <= currentMonth }.sortedDescending()
                 } else {
                     monthGroups.keys.sortedDescending()
                 }

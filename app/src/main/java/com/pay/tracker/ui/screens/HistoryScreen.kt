@@ -21,10 +21,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.History
@@ -41,6 +45,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -48,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.ui.platform.LocalContext
 import com.pay.tracker.ui.viewmodel.DatePeriodFilter
 import java.util.Calendar
 import java.util.TimeZone
@@ -106,6 +112,7 @@ fun HistoryScreen(
     val categories = viewModel.availableCategories
 
     var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
+    var selectedTransactionDetails by remember { mutableStateOf<Transaction?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var categoryMenuExpanded by remember { mutableStateOf(false) }
@@ -774,7 +781,7 @@ fun HistoryScreen(
 
                                             BotanicalTransactionRow(
                                                 transaction = txn,
-                                                onDelete = { transactionToDelete = txn }
+                                                onClick = { selectedTransactionDetails = txn }
                                             )
                                         }
                                     }
@@ -882,12 +889,29 @@ fun HistoryScreen(
             initialEndDateMillis = customDateRange?.second
         )
     }
+
+    // Transaction Details Bottom Sheet
+    selectedTransactionDetails?.let { txn ->
+        TransactionDetailsBottomSheet(
+            transaction = txn,
+            categories = categories,
+            onCategoryChange = { newCat ->
+                viewModel.updateCategory(txn.id, newCat)
+                selectedTransactionDetails = txn.copy(category = newCat)
+            },
+            onDelete = {
+                selectedTransactionDetails = null
+                transactionToDelete = txn
+            },
+            onDismissRequest = { selectedTransactionDetails = null }
+        )
+    }
 }
 
 @Composable
 private fun BotanicalTransactionRow(
     transaction: Transaction,
-    onDelete: () -> Unit
+    onClick: () -> Unit
 ) {
     val categoryColor = CategoryUiUtils.getCategoryColor(transaction.category)
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -896,6 +920,8 @@ private fun BotanicalTransactionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -949,7 +975,11 @@ private fun BotanicalTransactionRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Calendar Date Range Picker Dialog:
+ * Month navigation via side arrows (< and >),
+ * Year selection via center Month-Year pill opening a year matrix popup.
+ */
 @Composable
 private fun HistoryDateRangePickerDialog(
     onDismissRequest: () -> Unit,
@@ -957,25 +987,266 @@ private fun HistoryDateRangePickerDialog(
     initialStartDateMillis: Long? = null,
     initialEndDateMillis: Long? = null
 ) {
-    val dateRangePickerState = rememberDateRangePickerState(
-        initialSelectedStartDateMillis = initialStartDateMillis,
-        initialSelectedEndDateMillis = initialEndDateMillis
-    )
+    val initialCal = remember(initialStartDateMillis) {
+        Calendar.getInstance().apply {
+            if (initialStartDateMillis != null) timeInMillis = initialStartDateMillis
+        }
+    }
 
-    DatePickerDialog(
+    var displayedYear by remember { mutableStateOf(initialCal.get(Calendar.YEAR)) }
+    var displayedMonth by remember { mutableStateOf(initialCal.get(Calendar.MONTH)) } // 0..11
+    var selectedStartDate by remember { mutableStateOf(initialStartDateMillis) }
+    var selectedEndDate by remember { mutableStateOf(initialEndDateMillis) }
+    var showYearMatrixDialog by remember { mutableStateOf(false) }
+
+    val todayCal = remember { Calendar.getInstance() }
+    val currentYear = remember { todayCal.get(Calendar.YEAR) }
+    val currentMonth = remember { todayCal.get(Calendar.MONTH) } // 0..11
+    val currentDay = remember { todayCal.get(Calendar.DAY_OF_MONTH) }
+
+    val monthNames = remember {
+        listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    }
+
+    val canGoNextMonth = (displayedYear < currentYear) || (displayedYear == currentYear && displayedMonth < currentMonth)
+
+    AlertDialog(
         onDismissRequest = onDismissRequest,
+        containerColor = Color(0xFF14241C),
+        shape = RoundedCornerShape(24.dp),
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header Title & Month/Year Navigation Row with Side Arrows
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (displayedMonth == 0) {
+                                displayedMonth = 11
+                                displayedYear -= 1
+                            } else {
+                                displayedMonth -= 1
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Previous Month",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Tappable Month Year pill that opens the Year Matrix
+                    Surface(
+                        onClick = { showYearMatrixDialog = true },
+                        shape = CircleShape,
+                        color = Color(0x33253B2F),
+                        border = BorderStroke(1.dp, Color(0x33C4C59E))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${monthNames[displayedMonth]} $displayedYear",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Change Year",
+                                tint = BotanicalEmerald,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            if (canGoNextMonth) {
+                                if (displayedMonth == 11) {
+                                    displayedMonth = 0
+                                    displayedYear += 1
+                                } else {
+                                    displayedMonth += 1
+                                }
+                            }
+                        },
+                        enabled = canGoNextMonth,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Next Month",
+                            tint = if (canGoNextMonth) Color.White else Color.White.copy(alpha = 0.25f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Days of week header (S M T W T F S)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    listOf("S", "M", "T", "W", "T", "F", "S").forEach { dayLabel ->
+                        Text(
+                            text = dayLabel,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = BotanicalTextSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Calendar Grid for displayedMonth & displayedYear
+                val monthCal = remember(displayedYear, displayedMonth) {
+                    Calendar.getInstance().apply {
+                        set(Calendar.YEAR, displayedYear)
+                        set(Calendar.MONTH, displayedMonth)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                    }
+                }
+
+                val firstDayOfWeek = monthCal.get(Calendar.DAY_OF_WEEK) - 1 // 0 for Sunday
+                val totalDays = monthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val totalSlots = ((firstDayOfWeek + totalDays + 6) / 7) * 7
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    for (week in 0 until (totalSlots / 7)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            for (dayOfWeek in 0..6) {
+                                val slotIndex = week * 7 + dayOfWeek
+                                val dayNum = slotIndex - firstDayOfWeek + 1
+
+                                if (dayNum in 1..totalDays) {
+                                    val isFuture = (displayedYear > currentYear) ||
+                                            (displayedYear == currentYear && displayedMonth > currentMonth) ||
+                                            (displayedYear == currentYear && displayedMonth == currentMonth && dayNum > currentDay)
+
+                                    val dayStart = remember(displayedYear, displayedMonth, dayNum) {
+                                        Calendar.getInstance().apply {
+                                            set(Calendar.YEAR, displayedYear)
+                                            set(Calendar.MONTH, displayedMonth)
+                                            set(Calendar.DAY_OF_MONTH, dayNum)
+                                            set(Calendar.HOUR_OF_DAY, 0)
+                                            set(Calendar.MINUTE, 0)
+                                            set(Calendar.SECOND, 0)
+                                            set(Calendar.MILLISECOND, 0)
+                                        }.timeInMillis
+                                    }
+
+                                    val dayEnd = remember(dayStart) { dayStart + 86_400_000L - 1L }
+
+                                    val isStart = selectedStartDate != null && (dayStart == selectedStartDate || (selectedStartDate!! in dayStart..dayEnd))
+                                    val isEnd = selectedEndDate != null && (dayEnd == selectedEndDate || (selectedEndDate!! in dayStart..dayEnd))
+                                    val isInRange = selectedStartDate != null && selectedEndDate != null &&
+                                            dayStart >= selectedStartDate!! && dayEnd <= selectedEndDate!!
+
+                                    val cellBg = when {
+                                        isStart || isEnd -> BotanicalEmerald
+                                        isInRange -> BotanicalEmerald.copy(alpha = 0.25f)
+                                        else -> Color.Transparent
+                                    }
+
+                                    val textColor = when {
+                                        isFuture -> Color.White.copy(alpha = 0.22f)
+                                        isStart || isEnd -> Color(0xFF112117)
+                                        isInRange -> Color.White
+                                        else -> Color.White
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .size(34.dp)
+                                            .clip(if (isStart || isEnd) CircleShape else RoundedCornerShape(4.dp))
+                                            .background(cellBg)
+                                            .clickable(enabled = !isFuture) {
+                                                if (selectedStartDate == null || (selectedStartDate != null && selectedEndDate != null)) {
+                                                    selectedStartDate = dayStart
+                                                    selectedEndDate = null
+                                                } else if (dayStart < selectedStartDate!!) {
+                                                    selectedStartDate = dayStart
+                                                    selectedEndDate = null
+                                                } else {
+                                                    selectedEndDate = dayEnd
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = dayNum.toString(),
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isStart || isEnd) FontWeight.Bold else FontWeight.Normal,
+                                            color = textColor
+                                        )
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Readout of currently picked range
+                val rangeFmt = remember { SimpleDateFormat("d MMM yyyy", Locale.getDefault()) }
+                val rangeLabel = when {
+                    selectedStartDate != null && selectedEndDate != null ->
+                        "${rangeFmt.format(Date(selectedStartDate!!))} – ${rangeFmt.format(Date(selectedEndDate!!))}"
+                    selectedStartDate != null ->
+                        "From ${rangeFmt.format(Date(selectedStartDate!!))} (select end date)"
+                    else -> "Select start date"
+                }
+
+                Text(
+                    text = rangeLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = BotanicalEmerald,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val start = dateRangePickerState.selectedStartDateMillis
-                    val end = dateRangePickerState.selectedEndDateMillis ?: start
+                    val start = selectedStartDate
+                    val end = selectedEndDate ?: start
                     if (start != null && end != null) {
-                        val (localStart, localEnd) = convertUtcMidnightToLocalRange(start, end)
-                        onDateRangeSelected(localStart, localEnd)
+                        onDateRangeSelected(start, end)
                     }
                     onDismissRequest()
                 },
-                enabled = dateRangePickerState.selectedStartDateMillis != null
+                enabled = selectedStartDate != null
             ) {
                 Text("Apply", color = BotanicalEmerald, fontWeight = FontWeight.Bold)
             }
@@ -984,59 +1255,366 @@ private fun HistoryDateRangePickerDialog(
             TextButton(onClick = onDismissRequest) {
                 Text("Cancel", color = BotanicalTextSecondary)
             }
-        },
-        colors = DatePickerDefaults.colors(
-            containerColor = Color(0xFF14241C)
-        )
-    ) {
-        DateRangePicker(
-            state = dateRangePickerState,
+        }
+    )
+
+    // Year Matrix Popup Dialog
+    if (showYearMatrixDialog) {
+        AlertDialog(
+            onDismissRequest = { showYearMatrixDialog = false },
+            containerColor = Color(0xFF1B2E24),
+            shape = RoundedCornerShape(20.dp),
             title = {
                 Text(
-                    text = "Select Date Range",
-                    modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp),
-                    color = Color.White,
+                    text = "Select Year",
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    color = Color.White
                 )
             },
-            headline = null,
-            showModeToggle = false,
-            colors = DatePickerDefaults.colors(
-                containerColor = Color(0xFF14241C),
-                titleContentColor = Color.White,
-                headlineContentColor = Color.White,
-                weekdayContentColor = BotanicalTextSecondary,
-                subheadContentColor = BotanicalTextSecondary,
-                yearContentColor = Color.White,
-                currentYearContentColor = BotanicalEmerald,
-                selectedYearContentColor = Color(0xFF112117),
-                selectedYearContainerColor = BotanicalEmerald,
-                dayContentColor = Color.White,
-                selectedDayContainerColor = BotanicalEmerald,
-                selectedDayContentColor = Color(0xFF112117),
-                dayInSelectionRangeContainerColor = BotanicalEmerald.copy(alpha = 0.35f),
-                dayInSelectionRangeContentColor = Color.White
-            )
+            text = {
+                val years = ((currentYear - 8)..currentYear).toList()
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    years.chunked(3).forEach { rowYears ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowYears.forEach { yr ->
+                                val isSelected = yr == displayedYear
+                                Surface(
+                                    onClick = {
+                                        displayedYear = yr
+                                        if (yr == currentYear && displayedMonth > currentMonth) {
+                                            displayedMonth = currentMonth
+                                        }
+                                        showYearMatrixDialog = false
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) BotanicalEmerald else Color(0x33253B2F),
+                                    border = BorderStroke(1.dp, if (isSelected) BotanicalEmerald else Color(0x2EFFFFFF)),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = yr.toString(),
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color(0xFF112117) else Color.White,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(vertical = 10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showYearMatrixDialog = false }) {
+                    Text("Close", color = BotanicalTextSecondary)
+                }
+            }
         )
     }
 }
 
-private fun convertUtcMidnightToLocalRange(startUtc: Long, endUtc: Long): Pair<Long, Long> {
-    val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        timeInMillis = startUtc
-    }
-    val localCalStart = Calendar.getInstance().apply {
-        set(utcCal.get(Calendar.YEAR), utcCal.get(Calendar.MONTH), utcCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
+/**
+ * Transaction Details Bottom Sheet
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TransactionDetailsBottomSheet(
+    transaction: Transaction,
+    categories: List<Category>,
+    onCategoryChange: (String) -> Unit,
+    onDelete: () -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    val categoryColor = CategoryUiUtils.getCategoryColor(transaction.category)
+    val dateFormat = remember { SimpleDateFormat("EEEE, d MMMM yyyy • h:mm a", Locale.getDefault()) }
+    val formattedDate = dateFormat.format(Date(transaction.timestamp))
+    val context = LocalContext.current
 
-    val utcCalEnd = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-        timeInMillis = endUtc
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        containerColor = Color(0xFF14241C),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 10.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x4DFFFFFF))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+        ) {
+            // Header: Category Icon, Merchant Name, Date
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BotanicalSquircleContainer(
+                    icon = CategoryUiUtils.getCategoryIcon(transaction.category),
+                    tint = categoryColor,
+                    backgroundColor = categoryColor.copy(alpha = 0.2f),
+                    size = 52.dp,
+                    iconSize = 26.dp
+                )
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = transaction.merchant,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = formattedDate,
+                        fontSize = 12.sp,
+                        color = BotanicalTextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Amount & Status Card
+            BotanicalGlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Amount",
+                            fontSize = 12.sp,
+                            color = BotanicalTextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "- " + CategoryUiUtils.formatCurrency(transaction.amount),
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    // Status Badge
+                    Surface(
+                        shape = CircleShape,
+                        color = when (transaction.status) {
+                            TransactionStatus.CONFIRMED -> Color(0x2B81C784)
+                            TransactionStatus.PENDING -> Color(0x33FFB74D)
+                            TransactionStatus.REJECTED -> Color(0x33FF5252)
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            when (transaction.status) {
+                                TransactionStatus.CONFIRMED -> Color(0x4D81C784)
+                                TransactionStatus.PENDING -> Color(0x4DFFB74D)
+                                TransactionStatus.REJECTED -> Color(0x4DFF5252)
+                            }
+                        )
+                    ) {
+                        Text(
+                            text = when (transaction.status) {
+                                TransactionStatus.CONFIRMED -> "Confirmed"
+                                TransactionStatus.PENDING -> "Pending"
+                                TransactionStatus.REJECTED -> "Rejected"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = when (transaction.status) {
+                                TransactionStatus.CONFIRMED -> Color(0xFF81C784)
+                                TransactionStatus.PENDING -> Color(0xFFFFB74D)
+                                TransactionStatus.REJECTED -> Color(0xFFFF6961)
+                            },
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Category Change Section
+            Text(
+                text = "Category",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = BotanicalTextSecondary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Quick Category selector horizontal scroll
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                categories.forEach { cat ->
+                    val isSelected = cat.name.equals(transaction.category, ignoreCase = true)
+                    val cColor = CategoryUiUtils.getCategoryColor(cat.name)
+                    Surface(
+                        onClick = { onCategoryChange(cat.name) },
+                        shape = CircleShape,
+                        color = if (isSelected) BotanicalCreamPill else Color(0x26253B2F),
+                        border = BorderStroke(1.dp, if (isSelected) BotanicalCreamPill else Color(0x26FFFFFF))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) BotanicalCreamPillText else cColor)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = cat.name,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) BotanicalCreamPillText else Color.White
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Reference ID (if present)
+            if (!transaction.referenceId.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                BotanicalGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Reference / UPI ID",
+                                fontSize = 11.sp,
+                                color = BotanicalTextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = transaction.referenceId,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Reference ID", transaction.referenceId))
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Reference ID",
+                                tint = BotanicalEmerald,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Raw SMS Message Card (if available)
+            if (transaction.rawNotification.isNotBlank()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                BotanicalGlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            text = "Original SMS Text",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = BotanicalTextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = transaction.rawNotification,
+                            fontSize = 12.sp,
+                            color = Color(0xFFD4E0D6),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Delete Transaction Button
+            Surface(
+                onClick = onDelete,
+                shape = CircleShape,
+                color = Color(0x26FF453A),
+                border = BorderStroke(1.dp, Color(0x40FF453A)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Delete Transaction",
+                        tint = Color(0xFFFF6961),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Delete Transaction",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFF6961)
+                    )
+                }
+            }
+        }
     }
-    val localCalEnd = Calendar.getInstance().apply {
-        set(utcCalEnd.get(Calendar.YEAR), utcCalEnd.get(Calendar.MONTH), utcCalEnd.get(Calendar.DAY_OF_MONTH), 23, 59, 59)
-        set(Calendar.MILLISECOND, 999)
-    }
-    return Pair(localCalStart.timeInMillis, localCalEnd.timeInMillis)
 }

@@ -48,12 +48,18 @@ class HistoryViewModel(
 
     val availableMonthYears: StateFlow<List<String>> = allTransactions
         .map { list ->
+            val now = Calendar.getInstance()
+            val curYear = now.get(Calendar.YEAR)
+            val curMonth = now.get(Calendar.MONTH) + 1
             val cal = Calendar.getInstance()
             val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
             list.groupBy { txn ->
                 cal.timeInMillis = txn.timestamp
                 cal.get(Calendar.YEAR) to (cal.get(Calendar.MONTH) + 1)
             }.keys
+            .filter { (year, month) ->
+                year < curYear || (year == curYear && month <= curMonth)
+            }
             .sortedWith(compareByDescending<Pair<Int, Int>> { it.first }.thenByDescending { it.second })
             .map { (year, month) ->
                 val c = Calendar.getInstance().apply {

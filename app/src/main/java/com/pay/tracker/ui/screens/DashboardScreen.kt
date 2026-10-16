@@ -187,13 +187,9 @@ fun DashboardScreen(
             item {
                 DashboardMonthSelector(
                     selectedMonth = selectedYearMonth,
-                    availableMonths = availableMonths,
-                    monthlySpendMap = monthlySpendMap,
                     onPreviousMonth = { viewModel.previousMonth() },
                     onNextMonth = { viewModel.nextMonth() },
-                    onSelectMonth = { viewModel.selectYearMonth(it) },
-                    onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() },
-                    onOpenYearlyBreakdown = { showYearlyBreakdownSheet = true }
+                    onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() }
                 )
             }
 
@@ -233,7 +229,12 @@ fun DashboardScreen(
             item {
                 BotanicalBudgetCard(
                     pacing = budgetPacing,
-                    onEditBudgetClick = { showEditBudgetDialog = true }
+                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                    onEditBudgetClick = {
+                        if (selectedYearMonth.isCurrentMonth) {
+                            showEditBudgetDialog = true
+                        }
+                    }
                 )
             }
 
@@ -383,15 +384,11 @@ private fun DashboardHeaderRow(
 @Composable
 private fun DashboardMonthSelector(
     selectedMonth: com.pay.tracker.ui.viewmodel.YearMonthSelection,
-    availableMonths: List<com.pay.tracker.ui.viewmodel.YearMonthSelection>,
-    monthlySpendMap: Map<com.pay.tracker.ui.viewmodel.YearMonthSelection, Double>,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onSelectMonth: (com.pay.tracker.ui.viewmodel.YearMonthSelection) -> Unit,
-    onJumpToCurrentMonth: () -> Unit,
-    onOpenYearlyBreakdown: () -> Unit
+    onJumpToCurrentMonth: () -> Unit
 ) {
-    var showMonthMenu by remember { mutableStateOf(false) }
+    val canGoNext = !selectedMonth.isCurrentMonth
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -415,109 +412,33 @@ private fun DashboardMonthSelector(
                 )
             }
 
-            Box {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { showMonthMenu = true }
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = selectedMonth.displayName,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Select Month",
-                        tint = BotanicalTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showMonthMenu,
-                    onDismissRequest = { showMonthMenu = false },
-                    modifier = Modifier.background(Color(0xFF1B2E24))
-                ) {
-                    availableMonths.forEach { ym ->
-                        val isSelected = ym == selectedMonth
-                        val spend = monthlySpendMap[ym] ?: 0.0
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = ym.displayName + if (ym.isCurrentMonth) " (Current)" else "",
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) BotanicalEmerald else Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Text(
-                                        text = "₹${"%,.2f".format(spend)}",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isSelected) BotanicalEmerald else BotanicalTextSecondary
-                                    )
-                                }
-                            },
-                            onClick = {
-                                onSelectMonth(ym)
-                                showMonthMenu = false
-                            }
-                        )
-                    }
-
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = null,
-                                    tint = BotanicalEmerald,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "All Years & Months Summary",
-                                    fontWeight = FontWeight.Bold,
-                                    color = BotanicalEmerald
-                                )
-                            }
-                        },
-                        onClick = {
-                            showMonthMenu = false
-                            onOpenYearlyBreakdown()
-                        }
-                    )
-                }
-            }
+            Text(
+                text = selectedMonth.displayName,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 6.dp)
+            )
 
             IconButton(
                 onClick = onNextMonth,
+                enabled = canGoNext,
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = "Next Month",
-                    tint = Color.White,
+                    tint = if (canGoNext) Color.White else Color.White.copy(alpha = 0.25f),
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Right side: Single contextual action (jump to current month if in past, or all months if current)
+        // Contextual action: Return to current month when browsing a past month
         if (!selectedMonth.isCurrentMonth) {
+            Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 onClick = onJumpToCurrentMonth,
                 shape = CircleShape,
@@ -533,32 +454,6 @@ private fun DashboardMonthSelector(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = BotanicalCreamPillText
-                    )
-                }
-            }
-        } else {
-            Surface(
-                onClick = onOpenYearlyBreakdown,
-                shape = CircleShape,
-                color = Color(0x33253B2F),
-                border = BorderStroke(1.dp, Color(0x2EFFFFFF))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = "Spend by Month",
-                        tint = BotanicalEmerald,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "All Months",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White
                     )
                 }
             }
@@ -805,6 +700,7 @@ private fun ActionButtonsRow(
 @Composable
 private fun BotanicalBudgetCard(
     pacing: BudgetPacing,
+    isCurrentMonth: Boolean,
     onEditBudgetClick: () -> Unit
 ) {
     val progressFraction by animateFloatAsState(
@@ -813,11 +709,9 @@ private fun BotanicalBudgetCard(
         label = "budgetProgress"
     )
 
-    val progressColor = if (pacing.isExceeded) Color(0xFFFF5252) else com.pay.tracker.ui.theme.BotanicalBudgetBarStart
-
     BotanicalGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onEditBudgetClick
+        onClick = if (isCurrentMonth) onEditBudgetClick else null
     ) {
         Column(
             modifier = Modifier
@@ -831,7 +725,7 @@ private fun BotanicalBudgetCard(
                 // Wallet Squircle Icon in warm cream / dark glass
                 BotanicalSquircleContainer(
                     icon = Icons.Default.Savings,
-                    tint = BotanicalCreamPill,
+                    tint = if (isCurrentMonth) BotanicalCreamPill else BotanicalEmerald,
                     backgroundColor = Color(0x33253B2F),
                     size = 40.dp,
                     iconSize = 20.dp
@@ -841,32 +735,73 @@ private fun BotanicalBudgetCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Monthly Budget",
+                        text = if (isCurrentMonth) "Monthly Budget" else "Month Closed",
                         fontSize = 12.sp,
                         color = BotanicalTextSecondary
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "${CategoryUiUtils.formatCurrency(pacing.remainingBudget)} remaining",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    if (isCurrentMonth) {
+                        Text(
+                            text = "${CategoryUiUtils.formatCurrency(pacing.remainingBudget)} remaining",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    } else {
+                        if (!pacing.isExceeded) {
+                            Text(
+                                text = "Saved ${CategoryUiUtils.formatCurrency(pacing.remainingBudget)}",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF81C784)
+                            )
+                        } else {
+                            val overSpend = pacing.spentThisMonth - pacing.budgetTarget
+                            Text(
+                                text = "Over by ${CategoryUiUtils.formatCurrency(overSpend)}",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF5252)
+                            )
+                        }
+                    }
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${pacing.percentUsed.toInt()}% used",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (pacing.isExceeded) Color(0xFFFF5252) else Color(0xFFC4D1BA)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "of ${CategoryUiUtils.formatCurrency(pacing.budgetTarget)}",
-                        fontSize = 11.sp,
-                        color = BotanicalTextSecondary
-                    )
+                    if (isCurrentMonth) {
+                        Text(
+                            text = "${pacing.percentUsed.toInt()}% used",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (pacing.isExceeded) Color(0xFFFF5252) else Color(0xFFC4D1BA)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "of ${CategoryUiUtils.formatCurrency(pacing.budgetTarget)}",
+                            fontSize = 11.sp,
+                            color = BotanicalTextSecondary
+                        )
+                    } else {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (pacing.isExceeded) Color(0x33FF5252) else Color(0x332E7D32),
+                            border = BorderStroke(1.dp, if (pacing.isExceeded) Color(0x4DFF5252) else Color(0x4D81C784))
+                        ) {
+                            Text(
+                                text = if (pacing.isExceeded) "Exceeded" else "Under Budget",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (pacing.isExceeded) Color(0xFFFF6961) else Color(0xFF81C784),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "${pacing.percentUsed.toInt()}% of budget",
+                            fontSize = 11.sp,
+                            color = BotanicalTextSecondary
+                        )
+                    }
                 }
             }
 

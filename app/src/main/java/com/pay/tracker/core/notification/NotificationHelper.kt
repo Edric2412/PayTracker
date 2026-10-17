@@ -121,7 +121,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle("₹$formattedAmount • $merchant")
             .setContentText(category)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

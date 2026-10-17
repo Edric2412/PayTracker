@@ -81,9 +81,9 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
-        // Pattern 11: Bank SMS "transfer to SWIGGY" / "by transfer to SWIGGY"
+        // Pattern 11: Bank SMS "transfer to SWIGGY" / "by transfer to SWIGGY" / "transferred to Ramesh"
         private val PATTERN_TRANSFER_TO = Pattern.compile(
-            """(?:transfer\s+to|by\s+transfer\s+to)\s+([^.,\n]+?)(?:\s+(?:Ref|UPI|Txn|Bal|Avl|on)\b|\s*\.|\s*$)""",
+            """(?:transfer(?:red)?\s+to|by\s+transfer\s+to)\s+([^.,\n]+?)(?:\s+(?:Ref|UPI|Txn|Bal|Avl|on)\b|\s*\.|\s*$)""",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -105,9 +105,9 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
-        // Pattern 14: Bank SMS "debited ... to ZEPTO (UPI Ref ...)"
+        // Pattern 14: Bank SMS "debited ... to ZEPTO (UPI Ref ...)" / "₹1,500 transferred to Ramesh"
         private val PATTERN_TO_MERCHANT = Pattern.compile(
-            """(?:debited|paid|sent)\s+.*?to\s+([^.,\n]+?)(?:\s+(?:UPI|txn|ref|rrn|Bal|Avl|\()\b|\s*\.|\s*$)""",
+            """(?:debited|paid|sent|transferred)\s+.*?to\s+([^.,\n]+?)(?:\s+(?:UPI|txn|ref|rrn|Bal|Avl|\()\b|\s*\.|\s*$)""",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -134,9 +134,27 @@ class GPayParser {
             Pattern.CASE_INSENSITIVE
         )
 
-        // Pattern 17b: "Paid ₹120 using HDFC Bank account" or "Sent Rs 500"
+        // Pattern 17b: "Paid ₹120 using HDFC Bank account" or "Sent Rs 500" or "Transferred ₹250"
         private val PATTERN_PAID_AMOUNT = Pattern.compile(
-            """(?:paid|sent)\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            """(?:paid|sent|transferred)\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 17c: "₹120 paid" or "₹ 500 sent" or "Rs 100 transferred"
+        private val PATTERN_AMOUNT_PAID = Pattern.compile(
+            """(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:paid|sent|transferred)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 17d: "Payment of ₹350" or "Payment of Rs 1,200"
+        private val PATTERN_PAYMENT_OF_AMOUNT = Pattern.compile(
+            """(?:payment\s+of)\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
+            Pattern.CASE_INSENSITIVE
+        )
+
+        // Pattern 17e: "Order confirmed for ₹420" or "order placed for Rs. 500"
+        private val PATTERN_ORDER_AMOUNT = Pattern.compile(
+            """(?:order\s+(?:placed|confirmed)\s+(?:for|of))\s*(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)""",
             Pattern.CASE_INSENSITIVE
         )
 
@@ -295,10 +313,14 @@ class GPayParser {
             Regex("""\b(?:has\s+been\s+|is\s+|was\s+)?debited\b"""),
             Regex("""\b(?:auto-debited|auto\s+debited|automatically\s+debited)\b"""),
             Regex("""\b(?:spent|spent\s+a\s+total\s+of)\b"""),
-            Regex("""\b(?:you\s+paid|paid\s+(?:inr|rs\.?|₹)?\s*[\d,]+|paid\s+to)\b"""),
-            Regex("""\b(?:payment\s+of\s+(?:inr|rs\.?|₹)?\s*[\d,]+|payment\s+to\s+[^.,\n]+?\s+of)\b"""),
-            Regex("""\b(?:sent\s+(?:inr|rs\.?|₹)?\s*[\d,]+|sent\s+to)\b"""),
-            Regex("""\b(?:withdrawn|withdrew)\b""")
+            Regex("""\b(?:you\s+paid|paid\s+(?:inr|rs\.?|₹)?\s*[\d,]+|paid\s+to|paid\s+successfully)\b"""),
+            Regex("""\b(?:payment\s+of\s+(?:inr|rs\.?|₹)?\s*[\d,]+|payment\s+to\s+[^.,\n]+?\s+of|payment\s+successful)\b"""),
+            Regex("""\b(?:sent\s+(?:inr|rs\.?|₹)?\s*[\d,]+|sent\s+to|sent\s+successfully)\b"""),
+            Regex("""\b(?:transferred\s+(?:inr|rs\.?|₹)?\s*[\d,]+|transfer\s+to|transfer\s+of\s+(?:inr|rs\.?|₹)?\s*[\d,]+)\b"""),
+            Regex("""\b(?:withdrawn|withdrew)\b"""),
+            Regex("""(?:inr|rs\.?|₹)\s*[\d,]+(?:\.\d{1,2})?\s*(?:paid|sent|transferred|debited)\b"""),
+            Regex("""\bpaid\b.*\b(?:to|at|towards)\b"""),
+            Regex("""\b(?:order\s+placed|order\s+confirmed|paid\s+for\s+order)\b""")
         )
         return completedDebitPatterns.any { it.containsMatchIn(combined) }
     }
@@ -316,6 +338,15 @@ class GPayParser {
      */
     fun isCreditNotification(title: String, text: String): Boolean {
         val combined = "$title $text".lowercase()
+        val titleLower = title.lowercase().trim()
+
+        // 0. TRAI SMS Sender / Header exclusions:
+        // - In India, sender headers ending with "-P" (e.g. AD-PANTLS-P, VM-PANTLS-P) are designated Promotional SMS.
+        // - 6-digit numeric shortcodes (e.g. AD-650022, 650025, 650026) are commercial telemarketer broadcast IDs.
+        // - Real bank transactional SMS never come from personal phone numbers (+91... or 10-digit mobile numbers).
+        if (titleLower.endsWith("-p") || Regex("""^[a-z]{2}-\d{5,6}$|^\d{5,6}$|^(?:\+?91)?[6-9]\d{9}$""").containsMatchIn(titleLower)) {
+            return false
+        }
 
         // 1. Mandatory exclusion: OTPs, verification codes, money requests
         val requestOrSecurityKeywords = listOf(
@@ -346,18 +377,50 @@ class GPayParser {
             return false
         }
 
-        // 4. Mandatory exclusion: Balance alerts, limit alerts, loan offers, bills
-        val alertPatterns = listOf(
-            Regex("""\b(?:avl\s+bal|available\s+balance|current\s+balance|account\s+balance\s+is|total\s+balance)\b"""),
+        // 4. Mandatory exclusion: Pure balance queries, limit notifications, bills
+        val pureAlertPatterns = listOf(
+            Regex("""^(?:your\s+)?(?:available\s+balance|avl\s+bal|current\s+balance|total\s+balance)\b"""),
             Regex("""\b(?:credit\s+card\s+limit|available\s+credit\s+limit|credit\s+limit\s+is)\b"""),
-            Regex("""\b(?:pre-approved|apply\s+now|instant\s+loan|personal\s+loan|loan\s+approved|winzo|rummy|game\s+wallet)\b"""),
             Regex("""\b(?:bill\s+generated|statement\s+generated|payment\s+due|amount\s+due|bill\s+is\s+due)\b""")
         )
-        if (alertPatterns.any { it.containsMatchIn(combined) }) {
+        if (pureAlertPatterns.any { it.containsMatchIn(combined) }) {
             return false
         }
 
-        // 5. Positive requirement: Must have explicit evidence of an actual completed credit
+        // 5. Mandatory exclusion: Marketing, Scam, Phishing, Shopping Offers, Loyalty Points, Credit Card promotions
+        val scamAndPromoPatterns = listOf(
+            // Pre-qualified / pre-approved credit cards / loans / limits
+            Regex("""\b(?:pre-qualified|pre-approved|pre qualified|pre approved)\b"""),
+            Regex("""\b(?:zero\s+joining\s+fee|joining\s+fee|annual\s+fee|annual\s+cashback|annual\s+savings)\b"""),
+            Regex("""\b(?:credit\s+limit\s+of\s+up\s+to|credit\s+limit\s+up\s+to|credit\s+limit\s*:)\b"""),
+            Regex("""\b(?:instant\s+loan|personal\s+loan|loan\s+approved|apply\s+(?:today|now|online))\b"""),
+            Regex("""\b(?:offer\s+valid|offer\s+ends|hurry,\s+offer|exclusive\s+offer|exclusive\s+deal|deal\s+just\s+became)\b"""),
+
+            // Shopping offers, retail discounts, sale, catalog
+            Regex("""\b(?:shop\s+for|shopping\s+for|shopping\s+of|on\s+shopping|best\s+sellers\s+catalogue)\b"""),
+            Regex("""\b(?:greencard|green\s+card|reward\s+points?|loyalty\s+points?|coupon\s+code)\b"""),
+            Regex("""\b(?:sale\b.*upto|upto\s+\d+%\s+off|up\s+to\s+\d+%\s+off)\b"""),
+
+            // Fake wallet / Lottery / Gaming / Rummy / Phishing / Task lures
+            Regex("""\b(?:to\s+your\s+wallet|in\s+your\s+wallet|wallet\s+a/c|game\s+wallet|rummy\s+wallet)\b"""),
+            Regex("""\b(?:to\s+claim|claim\s+now|click\s+to\s+claim|link\s+to\s+claim|claim\s+your|register\s+(?:your\s+account\s+)?and\s+claim)\b"""),
+            Regex("""\b(?:download\s+now|download\s+to\s+claim|complete\s+kyc|kyc\s+now|click\s+g\b)\b"""),
+            Regex("""\b(?:lottery|lucky\s+draw|cash\s+prize|scratch\s+card|spin\s+&\s+win|rummy|winzo|casino|part-time\s+job|work\s+from\s+home)\b"""),
+            Regex("""\b(?:will\s+expire\s+soon|expires\s+soon)\b"""),
+
+            // Future promises / Conditionals (NOT completed transactions)
+            Regex("""\b(?:will\s+be\s+credited|will\s+credit|to\s+be\s+credited)\b"""),
+            Regex("""\b(?:cashback\s+credit\s+on|cashback\s+will\s+be\s+credited|cashback\s+as\s+reward)\b"""),
+            Regex("""\b(?:get\s+(?:a\s+)?cashback|earn\s+cashback|max\s+cashback)\b"""),
+
+            // Approximate / Vague "Upto" amounts (real bank credits NEVER say "upto")
+            Regex("""\b(?:upto|up\s+to)\s*(?:inr|rs\.?|₹)?\s*[\d,]+""")
+        )
+        if (scamAndPromoPatterns.any { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 6. Positive requirement: Must have explicit evidence of an actual completed credit
         val completedCreditPatterns = listOf(
             Regex("""\b(?:has\s+been\s+|is\s+|was\s+)?credited\b"""),
             Regex("""\b(?:received\s+(?:inr|rs\.?|₹)?\s*[\d,]+|[\d,]+(?:\.\d{1,2})?\s*received\s+from)\b"""),
@@ -365,7 +428,23 @@ class GPayParser {
             Regex("""\b(?:cashback\s+of|cashback\s+received|cashback\s+credited)\b"""),
             Regex("""\b(?:amount\s+deposited|salary\s+credited|salary\s+of)\b""")
         )
-        return completedCreditPatterns.any { it.containsMatchIn(combined) }
+        if (completedCreditPatterns.none { it.containsMatchIn(combined) }) {
+            return false
+        }
+
+        // 7. Structural validation for SMS sources:
+        // Genuine bank credits MUST mention an account or a transaction rail (UPI / NEFT / IMPS / RTGS / Ref).
+        // App notifications from payment apps (e.g. GPay, PhonePe, Paytm) contain direct "Received ₹... from ...".
+        val isPaymentAppNotification = titleLower in setOf("google pay", "phonepe", "paytm", "cred", "bhim", "gpay")
+        if (!isPaymentAppNotification) {
+            val hasAccount = Regex("""\b(?:a/c\s*(?:no\.?)?|acct|account|a/cx)\s*[:\-]?\s*(?:(?:no\.?\s*)?[x*]*\d{2,}|[x*]+\d+)|\b(?:axis|hdfc|icici|sbi|kotak|pnb|bob|canara|bank)\s+(?:a/c|account)\b""", RegexOption.IGNORE_CASE).containsMatchIn(combined)
+            val hasBankingRail = Regex("""\b(?:UPI/(?:P2A|P2P|CR|DR)|UPI\s*Ref|Ref\s*(?:no\.?|:)|NEFT/|IMPS/|RTGS/|RRN|UTR|Txn\s*ID)\b""", RegexOption.IGNORE_CASE).containsMatchIn(combined)
+            if (!hasAccount && !hasBankingRail) {
+                return false
+            }
+        }
+
+        return true
     }
 
     /**
@@ -773,6 +852,12 @@ class GPayParser {
             if (amt != null && amt > 0.0) return amt
         }
 
+        val mAmtPaid = PATTERN_AMOUNT_PAID.matcher(content)
+        if (mAmtPaid.find()) {
+            val amt = parseAmount(mAmtPaid.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
         val m3 = PATTERN_SPENT_AMOUNT.matcher(content)
         if (m3.find()) {
             val amt = parseAmount(m3.group(1))
@@ -782,6 +867,24 @@ class GPayParser {
         val m4 = PATTERN_AMOUNT_SPENT.matcher(content)
         if (m4.find()) {
             val amt = parseAmount(m4.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mPayOf = PATTERN_PAYMENT_OF_AMOUNT.matcher(content)
+        if (mPayOf.find()) {
+            val amt = parseAmount(mPayOf.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mOrder = PATTERN_ORDER_AMOUNT.matcher(content)
+        if (mOrder.find()) {
+            val amt = parseAmount(mOrder.group(1))
+            if (amt != null && amt > 0.0) return amt
+        }
+
+        val mPaidTo = PATTERN_PAID_TO_MERCHANT_AMOUNT.matcher(content)
+        if (mPaidTo.find()) {
+            val amt = parseAmount(mPaidTo.group(2))
             if (amt != null && amt > 0.0) return amt
         }
 

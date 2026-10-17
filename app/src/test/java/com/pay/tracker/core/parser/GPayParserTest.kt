@@ -766,5 +766,115 @@ class GPayParserTest {
         val result = parser.parse(title, text)
         assertNull("Bill generation notice must be rejected", result)
     }
+
+    // ==========================================
+    // REJECTION: FAKE/SCAM SMS, PROMOTIONAL CASHBACK & PHISHING
+    // ==========================================
+
+    @Test
+    fun parse_airtelCreditCardPromo_isRejected() {
+        val title = "AD-650022"
+        val text = "Dear Beryl Juliet V S   , You're pre-qualified for Airtel Axis Bank Credit Card with ZERO Joining Fee, credit limit of up to Rs 500000 & annual cashback of Rs 18000. Offer valid till 31st Jan'23. Apply today i.airtel.in/cc_extj_act_c23"
+
+        val result = parser.parse(title, text)
+        assertNull("Credit card promo promising annual cashback must be rejected", result)
+    }
+
+    @Test
+    fun parse_pantaloonsGreencardCashbackPromo_isRejected() {
+        val title = "AD-PANTLS-P"
+        val text = "Dear Greencard Member, Here's an offer exclusively for you: Shop for Rs2000 at Pantaloons & get a cashback of Rs500 With the ongoing UPTO 60% OFF SALE. TC. Offer ends 20Jul. Cashback will be credited to Greencard a/c on 10Aug as reward points"
+
+        val result = parser.parse(title, text)
+        assertNull("Shopping promo offering reward points cashback must be rejected", result)
+    }
+
+    @Test
+    fun parse_fakeWalletDownloadApkScam_isRejected() {
+        val title = "VM-GMSCLK"
+        val text = "Dear Customer, Upto Rs.5,000 is credited to your Wallet Download now to Claim: http://gmg.im/bOlzXk Click G"
+
+        val result = parser.parse(title, text)
+        assertNull("Fake wallet credit phishing lure must be rejected", result)
+    }
+
+    @Test
+    fun parse_fakeLoanKycSpam_isRejected() {
+        val title = "VM-NUFINE"
+        val text = "Dear Customer Upto Rs.5,000 is credited to your Wallet A/c Complete KYC now- http://1kx.in/vvjFx6 NU Finance"
+
+        val result = parser.parse(title, text)
+        assertNull("Fake wallet credit KYC spam must be rejected", result)
+    }
+
+    @Test
+    fun parse_sbiUpiUserCredit_isParsedAsCredit() {
+        val title = "AX-SBIUPI"
+        val text = "Dear SBI UPI User, ur A/cX9270 credited by Rs100 on 10Nov23 by  (Ref no 331428818305)"
+
+        val result = parser.parse(title, text)
+        org.junit.Assert.assertNotNull("Genuine SBI UPI credit must be parsed", result)
+        org.junit.Assert.assertEquals(100.0, result!!.amount, 0.001)
+        org.junit.Assert.assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+        org.junit.Assert.assertEquals("331428818305", result.referenceId)
+    }
+
+    @Test
+    fun parse_axisBankNeftCredit_isParsedAsCredit() {
+        val title = "CP-AXISBK-S"
+        val text = "INR 25000.00 credited to A/c no. XX9270 on 02-05-26 at 18:32:53 IST. Info - NEFT/KVBLH00260611563/KUMA. Chk Bal https://ccm.axis.bank.in/AXISBK/ltt3Dvko - Axis Bank"
+
+        val result = parser.parse(title, text)
+        org.junit.Assert.assertNotNull("Genuine NEFT credit must be parsed", result)
+        org.junit.Assert.assertEquals(25000.0, result!!.amount, 0.001)
+        org.junit.Assert.assertEquals(com.pay.tracker.core.model.TransactionDirection.CREDIT, result.direction)
+    }
+
+    @Test
+    fun parse_amountPaidToMerchant_isParsedAsDebit() {
+        val title = "Google Pay"
+        val text = "₹500 paid to Chai Point"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(500.0, result!!.amount, 0.001)
+        assertEquals("Chai Point", result.merchant)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.DEBIT, result.direction)
+    }
+
+    @Test
+    fun parse_paymentSuccessfulPattern_isParsedAsDebit() {
+        val title = "Google Pay"
+        val text = "Payment of ₹350 to Starbucks successful"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(350.0, result!!.amount, 0.001)
+        assertEquals("Starbucks", result.merchant)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.DEBIT, result.direction)
+    }
+
+    @Test
+    fun parse_transferredPattern_isParsedAsDebit() {
+        val title = "Google Pay"
+        val text = "₹1,500 transferred to Ramesh"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(1500.0, result!!.amount, 0.001)
+        assertEquals("Ramesh", result.merchant)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.DEBIT, result.direction)
+    }
+
+    @Test
+    fun parse_swiggyOrderConfirmed_isParsedAsDebit() {
+        val title = "Swiggy"
+        val text = "Order confirmed for ₹420 at Burger King"
+
+        val result = parser.parse(title, text)
+        assertNotNull(result)
+        assertEquals(420.0, result!!.amount, 0.001)
+        assertEquals(com.pay.tracker.core.model.TransactionDirection.DEBIT, result.direction)
+    }
 }
 

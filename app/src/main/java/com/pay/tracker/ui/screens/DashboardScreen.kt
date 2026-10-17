@@ -139,6 +139,7 @@ fun DashboardScreen(
     val yearlySpendSummaries by viewModel.yearlySpendSummaries.collectAsState()
     val monthlySpendMap by viewModel.monthlySpendMap.collectAsState()
     val cashFlowMetrics by viewModel.cashFlowMetrics.collectAsState()
+    val peakExpense by viewModel.peakExpense.collectAsState()
 
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var showEditBudgetDialog by remember { mutableStateOf(false) }
@@ -243,15 +244,13 @@ fun DashboardScreen(
                 )
             }
 
-            // 6. 3-Stat Metric Cards Row: Daily Pace, Days Elapsed, Daily Average
+            // 6. 3-Stat Metric Cards Row: Transactions, Top Category, Peak Expense
             item {
                 ThreeStatCardsRow(
-                    dailyPace = budgetPacing.safeDailyPace,
-                    daysElapsed = budgetPacing.currentDayOfMonth,
-                    dailyAverage = monthDailyAverage,
-                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
                     confirmedCount = confirmedCount,
-                    totalDays = budgetPacing.totalDaysInMonth
+                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                    topCategoryExpense = categoryBreakdown.firstOrNull(),
+                    peakExpense = peakExpense
                 )
             }
 
@@ -495,7 +494,9 @@ private fun HeroSpendingVelocityCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = "Total Spent",
                         fontSize = 13.sp,
@@ -510,31 +511,25 @@ private fun HeroSpendingVelocityCard(
                         letterSpacing = (-1).sp,
                         color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Received: +₹${"%,.0f".format(incomeReceived)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = BotanicalEmerald
-                        )
-                        Text(
-                            text = " • ",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary.copy(alpha = 0.6f)
-                        )
-                        val netSign = if (netCashFlow >= 0) "+₹" else "-₹"
-                        val netColor = if (netCashFlow >= 0) BotanicalEmerald else Color(0xFFFF857D)
-                        Text(
-                            text = "Net Cash Flow: $netSign${"%,.0f".format(Math.abs(netCashFlow))}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = netColor
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Received: +${CategoryUiUtils.formatCurrency(incomeReceived)}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = BotanicalEmerald.copy(alpha = 0.85f)
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                    val netSign = if (netCashFlow >= 0) "+" else "-"
+                    val netColor = if (netCashFlow >= 0) BotanicalEmerald else Color(0xFFFF857D)
+                    Text(
+                        text = "Net Cash Flow: $netSign${CategoryUiUtils.formatCurrency(Math.abs(netCashFlow))}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = netColor.copy(alpha = 0.85f)
+                    )
                 }
+
+                Spacer(modifier = Modifier.width(12.dp))
 
                 // Dynamic Trend badge vs previous month
                 if (previousMonthTotal > 0.0) {
@@ -900,22 +895,20 @@ private fun BotanicalBudgetCard(
 
 
 /**
- * 3-Stat Metric Cards Row
+ * 3-Stat Metric Cards Row: Transactions, Top Category, Peak Expense
  */
 @Composable
 private fun ThreeStatCardsRow(
-    dailyPace: Double,
-    daysElapsed: Int,
-    dailyAverage: Double,
-    isCurrentMonth: Boolean,
     confirmedCount: Int,
-    totalDays: Int
+    isCurrentMonth: Boolean,
+    topCategoryExpense: CategoryExpense?,
+    peakExpense: DashboardViewModel.PeakExpenseInfo
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Daily Pace or Transactions count
+        // 1. Transaction Activity Count
         BotanicalGlassCard(
             modifier = Modifier.weight(1f),
             shape = RoundedCornerShape(18.dp)
@@ -927,7 +920,69 @@ private fun ThreeStatCardsRow(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isCurrentMonth) CategoryUiUtils.formatCurrency(dailyPace) else confirmedCount.toString(),
+                    text = confirmedCount.toString(),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = if (isCurrentMonth) "Transactions" else "Total txns",
+                    fontSize = 11.sp,
+                    color = BotanicalTextSecondary
+                )
+            }
+        }
+
+        // 2. Top Spending Category
+        val topCatName = topCategoryExpense?.category ?: "—"
+        val topCatPct = topCategoryExpense?.let { "${(it.percentage * 100).toInt()}%" } ?: ""
+        BotanicalGlassCard(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 14.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = topCatName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (topCategoryExpense != null) CategoryUiUtils.getCategoryColor(topCatName) else Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = if (topCatPct.isNotBlank()) "Top: $topCatPct" else "Top category",
+                    fontSize = 11.sp,
+                    color = BotanicalTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // 3. Peak / Largest Single Expense
+        val peakAmountText = if (peakExpense.amount > 0.0) CategoryUiUtils.formatCurrency(peakExpense.amount) else "—"
+        val peakSubText = if (peakExpense.merchant.isNotBlank()) peakExpense.merchant else "Peak spend"
+        BotanicalGlassCard(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 14.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = peakAmountText,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -936,63 +991,11 @@ private fun ThreeStatCardsRow(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = if (isCurrentMonth) "Daily pace" else "Transactions",
+                    text = peakSubText,
                     fontSize = 11.sp,
-                    color = BotanicalTextSecondary
-                )
-            }
-        }
-
-        // Days Elapsed or Total Days
-        BotanicalGlassCard(
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 14.dp, horizontal = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = if (isCurrentMonth) daysElapsed.toString() else totalDays.toString(),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = if (isCurrentMonth) "Days elapsed" else "Days in month",
-                    fontSize = 11.sp,
-                    color = BotanicalTextSecondary
-                )
-            }
-        }
-
-        // Daily Average
-        BotanicalGlassCard(
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 14.dp, horizontal = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = CategoryUiUtils.formatCurrency(dailyAverage),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = BotanicalTextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = "Daily avg",
-                    fontSize = 11.sp,
-                    color = BotanicalTextSecondary
                 )
             }
         }

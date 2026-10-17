@@ -46,6 +46,12 @@ interface TransactionDao {
     @Query("SELECT SUM(amount) FROM transactions WHERE status = 'CONFIRMED' AND timestamp >= :startEpoch")
     fun observeTotalSpentSince(startEpoch: Long): Flow<Double?>
 
+    @Query("SELECT * FROM transactions WHERE rawNotification IS NOT NULL AND rawNotification != ''")
+    suspend fun getAllTransactionsWithRaw(): List<TransactionEntity>
+
+    @Query("DELETE FROM transactions WHERE id IN (:ids)")
+    suspend fun deleteTransactionsByIds(ids: List<Long>)
+
     @Query("DELETE FROM transactions")
     suspend fun deleteAllTransactions()
 }

@@ -59,7 +59,19 @@ class PaymentNotificationListenerService : NotificationListenerService() {
             "com.bankofbaroda.mconnect",             // BOB World
             "com.canarabank.mobility",               // Canara Bank
             "com.idfcfirstbank.optimus",             // IDFC FIRST Bank
-            "com.indusind.mobile"                    // IndusInd Bank
+            "com.indusind.mobile",                   // IndusInd Bank
+            // Online shopping, food delivery, grocery, and ride-hailing apps that send transaction alerts
+            "in.swiggy.android",                     // Swiggy
+            "com.application.zomato",                // Zomato
+            "com.grofers.customerapp",               // Blinkit
+            "com.zeptoconsumerapp",                  // Zepto
+            "com.ubercab",                           // Uber
+            "com.rapido.passenger",                  // Rapido
+            "com.olacabs.customer",                  // Ola
+            "com.flipkart.android",                  // Flipkart
+            "com.myntra.android",                    // Myntra
+            "com.bbinstant",                         // BigBasket Instant
+            "com.bigbasket.mobileapp"                // BigBasket
         )
         val ALLOWED_PACKAGES = KNOWN_FINANCE_PACKAGES
     }
@@ -89,26 +101,19 @@ class PaymentNotificationListenerService : NotificationListenerService() {
         }
 
         val notification = sbn.notification ?: return
-        val extras = notification.extras ?: return
-
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
-        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty()
-        val body = when {
-            bigText.isNotBlank() -> bigText
-            text.isNotBlank() -> text
-            else -> subText
-        }
+        val (title, body) = extractNotificationContent(notification)
 
         val isKnownApp = packageName in KNOWN_FINANCE_PACKAGES ||
+            packageName == "com.android.shell" ||
             packageName.contains("pay") ||
             packageName.contains("upi") ||
             packageName.contains("bank") ||
             packageName.contains("sms") ||
             packageName.contains("mms") ||
             packageName.contains("messaging") ||
-            packageName.contains("wallet")
+            packageName.contains("message") ||
+            packageName.contains("wallet") ||
+            packageName.contains("finance")
 
         val isTransaction = gPayParser.isCompletedTransaction(title, body)
 
@@ -189,5 +194,80 @@ class PaymentNotificationListenerService : NotificationListenerService() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+    }
+
+    private fun extractNotificationContent(notification: Notification): Pair<String, String> {
+        val extras = notification.extras ?: return Pair("", "")
+
+        var title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            ?: extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString()
+            ?: extras.getString("android.title")
+            ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+            ?: ""
+
+        val textParts = LinkedHashSet<String>()
+
+        extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+        extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+        extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+        extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+        extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+
+        // Handle InboxStyle (array of CharSequence)
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        if (!textLines.isNullOrEmpty()) {
+            for (line in textLines) {
+                line?.toString()?.takeIf { it.isNotBlank() }?.let { textParts.add(it.trim()) }
+            }
+        }
+
+        // Handle MessagingStyle (array of Message Bundles) - used by Google Messages and Google Pay!
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (!messages.isNullOrEmpty()) {
+            try {
+                val parsedMessages = Notification.MessagingStyle.Message.getMessagesFromBundleArray(messages)
+                for (msg in parsedMessages) {
+                    val msgText = msg.text?.toString()
+                    val sender = msg.senderPerson?.name?.toString() ?: msg.sender?.toString()
+                    if (title.isBlank() && !sender.isNullOrBlank()) {
+                        title = sender
+                    }
+                    if (!msgText.isNullOrBlank()) {
+                        textParts.add(msgText.trim())
+                    }
+                }
+            } catch (_: Throwable) {
+                for (msg in messages) {
+                    if (msg is android.os.Bundle) {
+                        val msgText = msg.getCharSequence("text")?.toString()
+                        val sender = msg.getCharSequence("sender")?.toString()
+                        if (title.isBlank() && !sender.isNullOrBlank()) {
+                            title = sender
+                        }
+                        if (!msgText.isNullOrBlank()) {
+                            textParts.add(msgText.trim())
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ticker text fallback
+        notification.tickerText?.toString()?.takeIf { it.isNotBlank() }?.let {
+            textParts.add(it.trim())
+        }
+
+        val body = textParts.joinToString("\n")
+        return Pair(title.trim(), body.trim())
     }
 }

@@ -169,6 +169,12 @@ class DashboardViewModel(
     private val context: Context? = null
 ) : ViewModel() {
 
+    init {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            repository.purgeInvalidTransactions()
+        }
+    }
+
     private val prefs = context?.getSharedPreferences("pay_tracker_prefs", Context.MODE_PRIVATE)
 
     private val _budgetTarget = MutableStateFlow(
@@ -263,6 +269,30 @@ class DashboardViewModel(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0.0
+    )
+
+    data class PeakExpenseInfo(
+        val amount: Double = 0.0,
+        val merchant: String = ""
+    )
+
+    val peakExpense: StateFlow<PeakExpenseInfo> = combine(
+        selectedYearMonth,
+        repository.observeConfirmedTransactions()
+    ) { ym, txns ->
+        val monthExpenses = txns.filter { 
+            it.timestamp in ym.startEpoch()..ym.endEpoch() && CashFlowCalculator.isEligibleExpense(it) 
+        }
+        val largest = monthExpenses.maxByOrNull { it.amount }
+        if (largest != null) {
+            PeakExpenseInfo(largest.amount, largest.merchant)
+        } else {
+            PeakExpenseInfo(0.0, "")
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = PeakExpenseInfo()
     )
 
     val yearlySpendSummaries: StateFlow<List<YearlySpendSummary>> = repository.observeConfirmedTransactions()

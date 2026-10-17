@@ -80,6 +80,9 @@ class SmsTransactionImporter(
         var duplicates = 0
         var scanned = 0
 
+        // Clean up any previously imported false positive transactions
+        repository.purgeInvalidTransactions()
+
         try {
             val cursor = resolver.query(uri, projection, selection, selectionArgs, sortOrder)
             cursor?.use {
@@ -95,6 +98,12 @@ class SmsTransactionImporter(
 
                     // Strict boundary check: ensure SMS is within the requested month range
                     if (date < startEpoch || date > endEpoch) {
+                        continue
+                    }
+
+                    // Skip promotional / telemarketing / personal sender headers
+                    val addressLower = address.lowercase().trim()
+                    if (addressLower.endsWith("-p") || Regex("""^[a-z]{2}-\d{5,6}$|^\d{5,6}$|^(?:\+?91)?[6-9]\d{9}$""").containsMatchIn(addressLower)) {
                         continue
                     }
 
@@ -177,6 +186,9 @@ class SmsTransactionImporter(
         var duplicates = 0
         var scanned = 0
 
+        // Clean up any previously imported false positive transactions
+        repository.purgeInvalidTransactions()
+
         try {
             val cursor = resolver.query(uri, projection, null, null, "${Telephony.Sms.DATE} ASC")
             cursor?.use {
@@ -189,6 +201,12 @@ class SmsTransactionImporter(
                     val address = it.getString(addressIdx).orEmpty()
                     val body = it.getString(bodyIdx).orEmpty()
                     val date = it.getLong(dateIdx)
+
+                    // Skip promotional / telemarketing / personal sender headers
+                    val addressLower = address.lowercase().trim()
+                    if (addressLower.endsWith("-p") || Regex("""^[a-z]{2}-\d{5,6}$|^\d{5,6}$|^(?:\+?91)?[6-9]\d{9}$""").containsMatchIn(addressLower)) {
+                        continue
+                    }
 
                     val parsed = gPayParser.parse(
                         title = address,
@@ -241,5 +259,12 @@ class SmsTransactionImporter(
                 errorMessage = e.localizedMessage ?: "Failed to read SMS messages"
             )
         }
+    }
+
+    /**
+     * Purges previously imported transactions that fail the current parser rules.
+     */
+    suspend fun purgeInvalidTransactions(): Int = withContext(Dispatchers.IO) {
+        repository.purgeInvalidTransactions()
     }
 }

@@ -68,6 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,6 +88,7 @@ import com.pay.tracker.ui.theme.BotanicalGlassBorder
 import com.pay.tracker.ui.theme.BotanicalGlassBorderSubtle
 import com.pay.tracker.ui.theme.BotanicalGlassButton
 import com.pay.tracker.ui.theme.BotanicalGlassButtonBorder
+import com.pay.tracker.ui.theme.BotanicalGlassSurface
 import com.pay.tracker.ui.theme.BotanicalTextPrimary
 import com.pay.tracker.ui.theme.BotanicalTextSecondary
 import com.pay.tracker.core.model.TransactionDirection
@@ -96,6 +98,42 @@ import com.pay.tracker.ui.viewmodel.HistoryViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private sealed interface HistoryListItem {
+    val key: String
+    val contentType: Int
+
+    data class MonthHeaderItem(
+        override val key: String,
+        val monthName: String,
+        val totalAmountFormatted: String,
+        val txnCount: Int
+    ) : HistoryListItem {
+        override val contentType: Int = 1
+    }
+
+    data class DayHeaderItem(
+        override val key: String,
+        val dateHeader: String,
+        val dayDebits: Double,
+        val dayCredits: Double,
+        val dayDebitsFormatted: String,
+        val dayCreditsFormatted: String
+    ) : HistoryListItem {
+        override val contentType: Int = 2
+    }
+
+    data class TransactionRowItem(
+        override val key: String,
+        val transaction: Transaction,
+        val formattedTime: String,
+        val formattedAmount: String,
+        val isFirstInGroup: Boolean,
+        val isLastInGroup: Boolean
+    ) : HistoryListItem {
+        override val contentType: Int = 3
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -675,48 +713,83 @@ fun HistoryScreen(
             val filteredCredits = remember(transactions) {
                 transactions.filter { it.direction == TransactionDirection.CREDIT }.sumOf { it.amount }
             }
-            val summaryText = remember(selectedTypeFilter, filteredDebits, filteredCredits) {
-                when (selectedTypeFilter) {
-                    TransactionTypeFilter.EXPENSES_ONLY -> "Spent: ₹${"%,.2f".format(filteredDebits)}"
-                    TransactionTypeFilter.INCOME_ONLY -> "Received: +₹${"%,.2f".format(filteredCredits)}"
-                    TransactionTypeFilter.ALL -> {
-                        when {
-                            filteredDebits > 0 && filteredCredits > 0 ->
-                                "Spent: ₹${"%,.0f".format(filteredDebits)}  •  Received: +₹${"%,.0f".format(filteredCredits)}"
-                            filteredCredits > 0 ->
-                                "Received: +₹${"%,.2f".format(filteredCredits)}"
-                            else ->
-                                "Total Spent: ₹${"%,.2f".format(filteredDebits)}"
-                        }
-                    }
-                }
-            }
 
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0x2B104F32),
-                border = BorderStroke(1.dp, BotanicalEmerald.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0x33253B2F),
+                border = BorderStroke(1.dp, Brush.verticalGradient(listOf(BotanicalGlassBorder, BotanicalGlassBorderSubtle))),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Showing ${transactions.size} transactions",
+                        text = "Showing ${transactions.size} ${if (transactions.size == 1) "transaction" else "transactions"}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color.White
+                        color = BotanicalTextSecondary,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                    Text(
-                        text = summaryText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = BotanicalEmerald
-                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        when (selectedTypeFilter) {
+                            TransactionTypeFilter.EXPENSES_ONLY -> {
+                                Text(
+                                    text = "Spent: " + CategoryUiUtils.formatCurrency(filteredDebits),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                            TransactionTypeFilter.INCOME_ONLY -> {
+                                Text(
+                                    text = "Received: +" + CategoryUiUtils.formatCurrency(filteredCredits),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BotanicalEmerald
+                                )
+                            }
+                            TransactionTypeFilter.ALL -> {
+                                if (filteredDebits > 0 && filteredCredits > 0) {
+                                    Text(
+                                        text = "Spent: " + CategoryUiUtils.formatCurrency(filteredDebits),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Received: +" + CategoryUiUtils.formatCurrency(filteredCredits),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BotanicalEmerald
+                                    )
+                                } else if (filteredCredits > 0) {
+                                    Text(
+                                        text = "Received: +" + CategoryUiUtils.formatCurrency(filteredCredits),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BotanicalEmerald
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Spent: " + CategoryUiUtils.formatCurrency(filteredDebits),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -754,129 +827,229 @@ fun HistoryScreen(
                     }
                 }
             } else {
-                val monthGrouped = remember(transactions) {
+                val flatHistoryItems = remember(transactions) {
                     val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
                     val dateFormat = SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault())
                     val todayFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+                    val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
                     val nowStr = todayFormat.format(Date())
 
-                    transactions.groupBy { monthFormat.format(Date(it.timestamp)) }
-                        .mapValues { (_, monthTxns) ->
-                            monthTxns.groupBy { txn ->
-                                val txnStr = todayFormat.format(Date(txn.timestamp))
-                                if (txnStr == nowStr) "Today"
-                                else dateFormat.format(Date(txn.timestamp))
+                    val items = mutableListOf<HistoryListItem>()
+
+                    val monthGroups = transactions.groupBy { monthFormat.format(Date(it.timestamp)) }
+                    monthGroups.forEach { (monthName, monthTxns) ->
+                        val monthTotal = monthTxns.sumOf { it.amount }
+                        val monthTxnCount = monthTxns.size
+                        items.add(
+                            HistoryListItem.MonthHeaderItem(
+                                key = "month_header_$monthName",
+                                monthName = monthName,
+                                totalAmountFormatted = CategoryUiUtils.formatCurrency(monthTotal),
+                                txnCount = monthTxnCount
+                            )
+                        )
+
+                        val daysGroup = monthTxns.groupBy { txn ->
+                            val txnStr = todayFormat.format(Date(txn.timestamp))
+                            if (txnStr == nowStr) "Today"
+                            else dateFormat.format(Date(txn.timestamp))
+                        }
+
+                        daysGroup.forEach { (dateHeader, txnsForDate) ->
+                            var dayDebits = 0.0
+                            var dayCredits = 0.0
+                            for (t in txnsForDate) {
+                                if (t.direction == TransactionDirection.DEBIT) dayDebits += t.amount
+                                else if (t.direction == TransactionDirection.CREDIT) dayCredits += t.amount
+                            }
+
+                            items.add(
+                                HistoryListItem.DayHeaderItem(
+                                    key = "day_header_${monthName}_$dateHeader",
+                                    dateHeader = dateHeader,
+                                    dayDebits = dayDebits,
+                                    dayCredits = dayCredits,
+                                    dayDebitsFormatted = CategoryUiUtils.formatCurrency(dayDebits),
+                                    dayCreditsFormatted = CategoryUiUtils.formatCurrency(dayCredits)
+                                )
+                            )
+
+                            val totalInDate = txnsForDate.size
+                            txnsForDate.forEachIndexed { index, txn ->
+                                items.add(
+                                    HistoryListItem.TransactionRowItem(
+                                        key = "txn_${txn.id}_${monthName}_$dateHeader",
+                                        transaction = txn,
+                                        formattedTime = timeFormat.format(Date(txn.timestamp)),
+                                        formattedAmount = CategoryUiUtils.formatCurrency(txn.amount),
+                                        isFirstInGroup = (index == 0),
+                                        isLastInGroup = (index == totalInDate - 1)
+                                    )
+                                )
                             }
                         }
+                    }
+                    items
                 }
 
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    monthGrouped.forEach { (monthName, daysMap) ->
-                        val monthTotal = daysMap.values.flatten().sumOf { it.amount }
-                        val monthTxnCount = daysMap.values.flatten().size
-
-                        // Month & Year Header Banner
-                        item(key = "month_header_$monthName") {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0x33253B2F),
-                                border = BorderStroke(1.dp, Color(0x26FFFFFF))
-                            ) {
-                                Row(
+                    items(
+                        items = flatHistoryItems,
+                        key = { it.key },
+                        contentType = { it.contentType }
+                    ) { item ->
+                        when (item) {
+                            is HistoryListItem.MonthHeaderItem -> {
+                                Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(top = 10.dp, bottom = 6.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0x33253B2F),
+                                    border = BorderStroke(1.dp, Color(0x26FFFFFF))
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(BotanicalEmerald)
-                                        )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(BotanicalEmerald)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = item.monthName,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = monthName,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            text = "${item.totalAmountFormatted} • ${item.txnCount} txns",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = BotanicalTextSecondary
                                         )
                                     }
-                                    Text(
-                                        text = "${CategoryUiUtils.formatCurrency(monthTotal)} • $monthTxnCount txns",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = BotanicalTextSecondary
-                                    )
                                 }
                             }
-                        }
-
-                        // Days within this month
-                        daysMap.forEach { (dateHeader, txnsForDate) ->
-                            val dayDebits = txnsForDate.filter { it.direction == TransactionDirection.DEBIT }.sumOf { it.amount }
-                            val dayCredits = txnsForDate.filter { it.direction == TransactionDirection.CREDIT }.sumOf { it.amount }
-
-                            item(key = "header_${monthName}_$dateHeader") {
+                            is HistoryListItem.DayHeaderItem -> {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                        .padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = dateHeader,
+                                        text = item.dateHeader,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
+                                        color = Color.White,
+                                        modifier = Modifier.weight(1f, fill = false),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    val dateTotalText = when {
-                                        dayDebits > 0 && dayCredits > 0 ->
-                                            "- ${CategoryUiUtils.formatCurrency(dayDebits)}  •  + ${CategoryUiUtils.formatCurrency(dayCredits)}"
-                                        dayCredits > 0 ->
-                                            "+ " + CategoryUiUtils.formatCurrency(dayCredits)
-                                        else ->
-                                            "- " + CategoryUiUtils.formatCurrency(dayDebits)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    if (item.dayDebits > 0 && item.dayCredits > 0) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "- ${item.dayDebitsFormatted}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = BotanicalTextSecondary
+                                            )
+                                            Text(
+                                                text = " • ",
+                                                fontSize = 12.sp,
+                                                color = BotanicalTextSecondary.copy(alpha = 0.5f)
+                                            )
+                                            Text(
+                                                text = "+ ${item.dayCreditsFormatted}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = BotanicalEmerald
+                                            )
+                                        }
+                                    } else if (item.dayCredits > 0) {
+                                        Text(
+                                            text = "+ ${item.dayCreditsFormatted}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = BotanicalEmerald
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "- ${item.dayDebitsFormatted}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = BotanicalTextSecondary
+                                        )
                                     }
-                                    val dateTotalColor = if (dayDebits == 0.0 && dayCredits > 0.0) BotanicalEmerald else BotanicalTextSecondary
-                                    Text(
-                                        text = dateTotalText,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = dateTotalColor
-                                    )
                                 }
                             }
+                            is HistoryListItem.TransactionRowItem -> {
+                                val cardShape = remember(item.isFirstInGroup, item.isLastInGroup) {
+                                    when {
+                                        item.isFirstInGroup && item.isLastInGroup -> RoundedCornerShape(20.dp)
+                                        item.isFirstInGroup -> RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                                        item.isLastInGroup -> RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+                                        else -> RectangleShape
+                                    }
+                                }
 
-                            item(key = "card_${monthName}_$dateHeader") {
-                                BotanicalGlassCard(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = if (item.isLastInGroup) 12.dp else 0.dp),
+                                    shape = cardShape,
+                                    color = BotanicalGlassSurface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                if (item.isFirstInGroup) BotanicalGlassBorder else BotanicalGlassBorderSubtle,
+                                                if (item.isLastInGroup) BotanicalGlassBorderSubtle else Color(0x14FFFFFF)
+                                            )
+                                        )
+                                    )
+                                ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            .padding(horizontal = 16.dp)
                                     ) {
-                                        txnsForDate.forEachIndexed { index, txn ->
-                                            if (index > 0) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(1.dp)
-                                                        .background(Color(0x14FFFFFF))
-                                                )
-                                            }
+                                        BotanicalTransactionRow(
+                                            transaction = item.transaction,
+                                            timeText = item.formattedTime,
+                                            formattedAmount = item.formattedAmount,
+                                            onClick = { selectedTransactionDetails = item.transaction },
+                                            modifier = Modifier.padding(
+                                                top = if (item.isFirstInGroup) 8.dp else 6.dp,
+                                                bottom = if (item.isLastInGroup) 8.dp else 6.dp
+                                            )
+                                        )
 
-                                            BotanicalTransactionRow(
-                                                transaction = txn,
-                                                onClick = { selectedTransactionDetails = txn }
+                                        if (!item.isLastInGroup) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(1.dp)
+                                                    .background(Color(0x14FFFFFF))
                                             )
                                         }
                                     }
@@ -885,7 +1058,7 @@ fun HistoryScreen(
                         }
                     }
 
-                    item {
+                    item(key = "history_bottom_spacer") {
                         Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
@@ -1006,23 +1179,25 @@ fun HistoryScreen(
 @Composable
 private fun BotanicalTransactionRow(
     transaction: Transaction,
-    onClick: () -> Unit
+    timeText: String,
+    formattedAmount: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val categoryColor = CategoryUiUtils.getCategoryColor(transaction.category)
-    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    val timeText = timeFormat.format(Date(transaction.timestamp))
+    val categoryColor = remember(transaction.category) { CategoryUiUtils.getCategoryColor(transaction.category) }
+    val categoryIcon = remember(transaction.category) { CategoryUiUtils.getCategoryIcon(transaction.category) }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Squircle Category Icon
         BotanicalSquircleContainer(
-            icon = CategoryUiUtils.getCategoryIcon(transaction.category),
+            icon = categoryIcon,
             tint = categoryColor,
             backgroundColor = categoryColor.copy(alpha = 0.18f),
             size = 40.dp,
@@ -1055,7 +1230,7 @@ private fun BotanicalTransactionRow(
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = amountPrefix + CategoryUiUtils.formatCurrency(transaction.amount),
+                text = amountPrefix + formattedAmount,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = amountColor

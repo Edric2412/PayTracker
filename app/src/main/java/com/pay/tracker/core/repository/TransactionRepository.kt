@@ -22,6 +22,7 @@ interface TransactionRepository {
     suspend fun deleteTransaction(id: Long)
     suspend fun clearAllTransactions()
     suspend fun isDuplicate(fingerprint: String, referenceId: String?): Boolean
+    suspend fun purgeInvalidTransactions(): Int
 }
 
 class TransactionRepositoryImpl(
@@ -81,5 +82,30 @@ class TransactionRepositoryImpl(
             if (dao.findByReferenceId(referenceId) != null) return true
         }
         return dao.findByFingerprint(fingerprint) != null
+    }
+
+    override suspend fun purgeInvalidTransactions(): Int {
+        val candidates = dao.getAllTransactionsWithRaw()
+        val gPayParser = com.pay.tracker.core.parser.GPayParser()
+        val idsToDelete = mutableListOf<Long>()
+
+        for (entity in candidates) {
+            val raw = entity.rawNotification ?: continue
+            val source = entity.sourceApp ?: ""
+            if (source == "Manual" || raw == "Manual entry") {
+                continue
+            }
+            val parsed = gPayParser.parse(title = source, text = raw, postTime = entity.timestamp, packageName = source)
+            if (parsed == null) {
+                idsToDelete.add(entity.id)
+            } else if (parsed.direction.name != entity.direction || parsed.classification.name != entity.classification) {
+                idsToDelete.add(entity.id)
+            }
+        }
+
+        if (idsToDelete.isNotEmpty()) {
+            dao.deleteTransactionsByIds(idsToDelete)
+        }
+        return idsToDelete.size
     }
 }

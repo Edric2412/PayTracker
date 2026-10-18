@@ -36,6 +36,16 @@ class SettingsViewModel(
     private val _isImporting = MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting.asStateFlow()
 
+    data class SmsImportProgress(
+        val isImporting: Boolean = false,
+        val scanned: Int = 0,
+        val total: Int = 0,
+        val foundCount: Int = 0
+    )
+
+    private val _importProgress = MutableStateFlow(SmsImportProgress())
+    val importProgress: StateFlow<SmsImportProgress> = _importProgress.asStateFlow()
+
     private val _isResetDone = MutableStateFlow(false)
     val isResetDone: StateFlow<Boolean> = _isResetDone.asStateFlow()
 
@@ -64,10 +74,19 @@ class SettingsViewModel(
         viewModelScope.launch {
             _isImporting.value = true
             _importState.value = null
+            _importProgress.value = SmsImportProgress(isImporting = true)
             val importer = SmsTransactionImporter(repo)
-            val result = importer.importMonthSms(context)
+            val result = importer.importMonthSms(context) { scanned, total, found ->
+                _importProgress.value = SmsImportProgress(
+                    isImporting = true,
+                    scanned = scanned,
+                    total = total,
+                    foundCount = found
+                )
+            }
             _importState.value = result
             _isImporting.value = false
+            _importProgress.value = SmsImportProgress(isImporting = false)
         }
     }
 
@@ -76,11 +95,28 @@ class SettingsViewModel(
         viewModelScope.launch {
             _isImporting.value = true
             _importState.value = null
+            _importProgress.value = SmsImportProgress(isImporting = true)
             val importer = SmsTransactionImporter(repo)
-            val result = importer.importAllSms(context)
+            val result = importer.importAllSms(context) { scanned, total, found ->
+                _importProgress.value = SmsImportProgress(
+                    isImporting = true,
+                    scanned = scanned,
+                    total = total,
+                    foundCount = found
+                )
+            }
             _importState.value = result
             _isImporting.value = false
+            _importProgress.value = SmsImportProgress(isImporting = false)
         }
+    }
+
+    fun openAppDetailsSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
     }
 
     fun dismissImportResult() {

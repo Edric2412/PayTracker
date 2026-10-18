@@ -59,7 +59,8 @@ class SmsTransactionImporter(
     suspend fun importMonthSms(
         context: Context,
         startEpoch: Long = getStartOfMonthEpoch(),
-        endEpoch: Long = getEndOfMonthEpoch()
+        endEpoch: Long = getEndOfMonthEpoch(),
+        onProgress: (scanned: Int, total: Int, found: Int) -> Unit = { _, _, _ -> }
     ): SmsImportResult = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val uri = Telephony.Sms.Inbox.CONTENT_URI
@@ -86,12 +87,16 @@ class SmsTransactionImporter(
         try {
             val cursor = resolver.query(uri, projection, selection, selectionArgs, sortOrder)
             cursor?.use {
+                val totalCount = it.count
                 val addressIdx = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
                 val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
                 val dateIdx = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
 
                 while (it.moveToNext()) {
                     scanned++
+                    if (scanned % 5 == 0 || scanned == totalCount) {
+                        onProgress(scanned, totalCount, imported)
+                    }
                     val address = it.getString(addressIdx).orEmpty()
                     val body = it.getString(bodyIdx).orEmpty()
                     val date = it.getLong(dateIdx)
@@ -169,7 +174,8 @@ class SmsTransactionImporter(
      * original timestamp so it is categorized under its specific month and year.
      */
     suspend fun importAllSms(
-        context: Context
+        context: Context,
+        onProgress: (scanned: Int, total: Int, found: Int) -> Unit = { _, _, _ -> }
     ): SmsImportResult = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val uri = Telephony.Sms.Inbox.CONTENT_URI
@@ -192,12 +198,16 @@ class SmsTransactionImporter(
         try {
             val cursor = resolver.query(uri, projection, null, null, "${Telephony.Sms.DATE} ASC")
             cursor?.use {
+                val totalCount = it.count
                 val addressIdx = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
                 val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
                 val dateIdx = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
 
                 while (it.moveToNext()) {
                     scanned++
+                    if (scanned % 5 == 0 || scanned == totalCount) {
+                        onProgress(scanned, totalCount, imported)
+                    }
                     val address = it.getString(addressIdx).orEmpty()
                     val body = it.getString(bodyIdx).orEmpty()
                     val date = it.getLong(dateIdx)

@@ -78,6 +78,7 @@ import com.pay.tracker.ui.components.BotanicalGlassButton
 import com.pay.tracker.ui.components.BotanicalGlassCard
 import com.pay.tracker.ui.components.BotanicalSquircleContainer
 import com.pay.tracker.ui.components.CategoryUiUtils
+import com.pay.tracker.ui.components.SmsScanningProgressDialog
 import com.pay.tracker.ui.theme.BotanicalCreamPill
 import com.pay.tracker.ui.theme.BotanicalCreamPillText
 import com.pay.tracker.ui.theme.BotanicalEmerald
@@ -92,6 +93,7 @@ import com.pay.tracker.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onNavigateToSimulator: () -> Unit = {},
+    onReplayTour: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -103,6 +105,7 @@ fun SettingsScreen(
     val isBiometricHardwareAvailable = remember { viewModel.isBiometricHardwareAvailable(context) }
     val importResult by viewModel.importState.collectAsState()
     val isImporting by viewModel.isImporting.collectAsState()
+    val importProgress by viewModel.importProgress.collectAsState()
     val isResetDone by viewModel.isResetDone.collectAsState()
 
     var showResetConfirmDialog by remember { mutableStateOf(false) }
@@ -189,8 +192,8 @@ fun SettingsScreen(
                         ) {
                             BotanicalSquircleContainer(
                                 icon = if (isNotificationAccessGranted) Icons.Default.NotificationsActive else Icons.Default.Notifications,
-                                tint = if (isNotificationAccessGranted) BotanicalEmerald else Color(0xFFFFB74D),
-                                backgroundColor = if (isNotificationAccessGranted) Color(0x264EBA74) else Color(0x26FFB74D),
+                                tint = if (isNotificationAccessGranted) BotanicalEmerald else BotanicalTextSecondary,
+                                backgroundColor = if (isNotificationAccessGranted) Color(0x264EBA74) else Color(0x1AD4DEC9),
                                 size = 42.dp,
                                 iconSize = 20.dp
                             )
@@ -208,7 +211,7 @@ fun SettingsScreen(
                                 Text(
                                     text = if (isNotificationAccessGranted) "Active & Listening" else "Permission Required",
                                     fontSize = 12.sp,
-                                    color = if (isNotificationAccessGranted) BotanicalEmerald else Color(0xFFFFB74D)
+                                    color = if (isNotificationAccessGranted) BotanicalEmerald else BotanicalTextSecondary
                                 )
                             }
                         }
@@ -227,6 +230,44 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
+                        // Android 13+ Restricted Settings Warning / Helper Card
+                        if (!isNotificationAccessGranted) {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0x1A2EE89A),
+                                border = BorderStroke(1.dp, Color(0x332EE89A)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Seeing 'Restricted setting'?",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = BotanicalEmerald
+                                    )
+                                    Text(
+                                        text = "On Android 13+, Google restricts notification listeners on sideloaded apps by default.\n" +
+                                                "1. Tap 'Open App Settings' below.\n" +
+                                                "2. Tap the three dots (⋮) in the top-right corner.\n" +
+                                                "3. Tap 'Allow restricted settings' and confirm your PIN.\n" +
+                                                "4. Return here and tap 'Grant Access'.",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFC7D3CD),
+                                        lineHeight = 17.sp
+                                    )
+                                    BotanicalGlassButton(
+                                        text = "Open App Settings",
+                                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                                        onClick = { viewModel.openAppDetailsSettings(context) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
 
                         // Battery Optimization
@@ -236,8 +277,8 @@ fun SettingsScreen(
                         ) {
                             BotanicalSquircleContainer(
                                 icon = if (isIgnoringBatteryOptimizations) Icons.Default.CheckCircle else Icons.Default.BatteryAlert,
-                                tint = if (isIgnoringBatteryOptimizations) BotanicalEmerald else Color(0xFF38B2AC),
-                                backgroundColor = if (isIgnoringBatteryOptimizations) Color(0x264EBA74) else Color(0x2638B2AC),
+                                tint = if (isIgnoringBatteryOptimizations) BotanicalEmerald else BotanicalTextSecondary,
+                                backgroundColor = if (isIgnoringBatteryOptimizations) Color(0x264EBA74) else Color(0x1AD4DEC9),
                                 size = 42.dp,
                                 iconSize = 20.dp
                             )
@@ -295,8 +336,8 @@ fun SettingsScreen(
                         ) {
                             BotanicalSquircleContainer(
                                 icon = Icons.Default.Fingerprint,
-                                tint = if (isBiometricLockEnabled) BotanicalEmerald else Color(0xFF64B5F6),
-                                backgroundColor = if (isBiometricLockEnabled) Color(0x264EBA74) else Color(0x2664B5F6),
+                                tint = if (isBiometricLockEnabled) BotanicalEmerald else BotanicalTextSecondary,
+                                backgroundColor = if (isBiometricLockEnabled) Color(0x264EBA74) else Color(0x1AD4DEC9),
                                 size = 42.dp,
                                 iconSize = 22.dp
                             )
@@ -436,8 +477,8 @@ fun SettingsScreen(
                         ) {
                             BotanicalSquircleContainer(
                                 icon = Icons.Default.BugReport,
-                                tint = Color(0xFF38B2AC),
-                                backgroundColor = Color(0x2638B2AC),
+                                tint = BotanicalEmerald,
+                                backgroundColor = Color(0x264EBA74),
                                 size = 42.dp,
                                 iconSize = 20.dp
                             )
@@ -467,7 +508,58 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. Data Management (Clear Data)
+            // 4. Guide & Onboarding Tour Section
+            item {
+                Text(
+                    text = "Guide & Onboarding",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BotanicalTextSecondary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                )
+
+                BotanicalGlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            BotanicalSquircleContainer(
+                                icon = Icons.Default.CheckCircle,
+                                tint = BotanicalEmerald,
+                                backgroundColor = Color(0x264EBA74),
+                                size = 42.dp,
+                                iconSize = 20.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "App Feature Walkthrough",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Replay the interactive guided tour of all dashboard features.",
+                                    fontSize = 12.sp,
+                                    color = BotanicalTextSecondary
+                                )
+                            }
+                        }
+                        BotanicalGlassButton(
+                            text = "Replay App Tour",
+                            onClick = onReplayTour,
+                            icon = Icons.AutoMirrored.Filled.ArrowForward,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // 5. Data Management (Clear Data)
             item {
                 Text(
                     text = "Data Management",
@@ -528,11 +620,18 @@ fun SettingsScreen(
                 }
             }
 
-
             item {
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
+    }
+
+    if (importProgress.isImporting) {
+        SmsScanningProgressDialog(
+            scanned = importProgress.scanned,
+            total = importProgress.total,
+            foundCount = importProgress.foundCount
+        )
     }
 
     if (showResetConfirmDialog) {

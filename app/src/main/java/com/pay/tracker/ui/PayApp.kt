@@ -111,6 +111,10 @@ fun PayApp(
                 SettingsScreen(
                     viewModel = settingsViewModel,
                     onNavigateToSimulator = { currentRoute = Screen.Simulator.route },
+                    onReplayTour = {
+                        dashboardViewModel.restartWalkthrough()
+                        currentRoute = Screen.Dashboard.route
+                    },
                     modifier = screenModifier
                 )
             }

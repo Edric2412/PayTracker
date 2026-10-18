@@ -87,11 +87,13 @@ import com.pay.tracker.core.model.Category
 import com.pay.tracker.core.model.TransactionDirection
 import com.pay.tracker.core.model.TransactionClassification
 import com.pay.tracker.core.sms.SmsImportResult
+import com.pay.tracker.ui.components.AppWalkthroughSpotlightOverlay
 import com.pay.tracker.ui.components.BotanicalCreamButton
 import com.pay.tracker.ui.components.BotanicalGlassButton
 import com.pay.tracker.ui.components.BotanicalGlassCard
 import com.pay.tracker.ui.components.BotanicalSquircleContainer
 import com.pay.tracker.ui.components.CategoryUiUtils
+import com.pay.tracker.ui.components.SmsScanningProgressDialog
 import com.pay.tracker.ui.theme.BotanicalCreamPill
 import com.pay.tracker.ui.theme.BotanicalCreamPillText
 import com.pay.tracker.ui.theme.BotanicalEmerald
@@ -129,6 +131,8 @@ fun DashboardScreen(
     val monthDailySpendHistory by viewModel.monthDailySpendHistory.collectAsState()
     val importResult by viewModel.importState.collectAsState()
     val isImporting by viewModel.isImporting.collectAsState()
+    val importProgress by viewModel.importProgress.collectAsState()
+    val showWalkthrough by viewModel.showWalkthrough.collectAsState()
     val budgetPacing by viewModel.budgetPacing.collectAsState()
     val timeframeSummary by viewModel.timeframeSummary.collectAsState()
     val categoryBreakdown by viewModel.categoryBreakdown.collectAsState()
@@ -164,10 +168,11 @@ fun DashboardScreen(
 
     val pendingCount = pendingList.size
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = Color.Transparent
-    ) { innerPadding ->
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent
+        ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -315,6 +320,21 @@ fun DashboardScreen(
             onSelectMonth = { viewModel.selectYearMonth(it) },
             onDismissRequest = { showYearlyBreakdownSheet = false }
         )
+    }
+
+    if (importProgress.isImporting) {
+        SmsScanningProgressDialog(
+            scanned = importProgress.scanned,
+            total = importProgress.total,
+            foundCount = importProgress.foundCount
+        )
+    }
+
+    if (showWalkthrough) {
+        AppWalkthroughSpotlightOverlay(
+            onDismiss = { viewModel.dismissWalkthrough() }
+        )
+    }
     }
 }
 

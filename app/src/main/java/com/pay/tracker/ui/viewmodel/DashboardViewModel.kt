@@ -665,11 +665,35 @@ class DashboardViewModel(
             initialValue = emptyList()
         )
 
+    data class SmsImportProgress(
+        val isImporting: Boolean = false,
+        val scanned: Int = 0,
+        val total: Int = 0,
+        val foundCount: Int = 0
+    )
+
+    private val _importProgress = kotlinx.coroutines.flow.MutableStateFlow(SmsImportProgress())
+    val importProgress: StateFlow<SmsImportProgress> = _importProgress.asStateFlow()
+
     private val _importState = kotlinx.coroutines.flow.MutableStateFlow<com.pay.tracker.core.sms.SmsImportResult?>(null)
     val importState: StateFlow<com.pay.tracker.core.sms.SmsImportResult?> = _importState
 
     private val _isImporting = kotlinx.coroutines.flow.MutableStateFlow(false)
     val isImporting: StateFlow<Boolean> = _isImporting
+
+    private val _showWalkthrough = MutableStateFlow(
+        !(prefs?.getBoolean("has_completed_walkthrough", false) ?: false)
+    )
+    val showWalkthrough: StateFlow<Boolean> = _showWalkthrough.asStateFlow()
+
+    fun dismissWalkthrough() {
+        _showWalkthrough.value = false
+        prefs?.edit()?.putBoolean("has_completed_walkthrough", true)?.apply()
+    }
+
+    fun restartWalkthrough() {
+        _showWalkthrough.value = true
+    }
 
     fun addManualTransaction(
         amount: Double,
@@ -719,10 +743,19 @@ class DashboardViewModel(
         viewModelScope.launch {
             _isImporting.value = true
             _importState.value = null
+            _importProgress.value = SmsImportProgress(isImporting = true)
             val importer = com.pay.tracker.core.sms.SmsTransactionImporter(repository)
-            val result = importer.importMonthSms(context)
+            val result = importer.importMonthSms(context) { scanned, total, found ->
+                _importProgress.value = SmsImportProgress(
+                    isImporting = true,
+                    scanned = scanned,
+                    total = total,
+                    foundCount = found
+                )
+            }
             _importState.value = result
             _isImporting.value = false
+            _importProgress.value = SmsImportProgress(isImporting = false)
         }
     }
 
@@ -730,10 +763,19 @@ class DashboardViewModel(
         viewModelScope.launch {
             _isImporting.value = true
             _importState.value = null
+            _importProgress.value = SmsImportProgress(isImporting = true)
             val importer = com.pay.tracker.core.sms.SmsTransactionImporter(repository)
-            val result = importer.importAllSms(context)
+            val result = importer.importAllSms(context) { scanned, total, found ->
+                _importProgress.value = SmsImportProgress(
+                    isImporting = true,
+                    scanned = scanned,
+                    total = total,
+                    foundCount = found
+                )
+            }
             _importState.value = result
             _isImporting.value = false
+            _importProgress.value = SmsImportProgress(isImporting = false)
         }
     }
 

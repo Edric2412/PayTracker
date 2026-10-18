@@ -314,13 +314,13 @@ button{font:inherit}
 .full-video-section::before{
     content:'';
     position:absolute;
-    top:25%;
+    top:50%;
     left:50%;
     transform:translate(-50%, -50%);
-    width:500px;
-    height:500px;
-    background:radial-gradient(circle, rgba(46, 232, 154, 0.18) 0%, transparent 65%);
-    filter:blur(60px);
+    width:min(1100px, 96vw);
+    height:640px;
+    background:radial-gradient(circle, rgba(46, 232, 154, 0.22) 0%, rgba(20, 52, 35, 0.1) 50%, transparent 75%);
+    filter:blur(70px);
     pointer-events:none;
 }
 .video-header{
@@ -341,32 +341,38 @@ button{font:inherit}
     line-height:1.7;
 }
 
-/* Master Video Chassis Frame */
+/* Master Video Widescreen Cinema Theater Frame */
 .video-cinema-box{
     position:relative;
-    max-width:340px;
+    width:min(1040px, 94vw);
+    max-width:1040px;
     margin:0 auto;
-    border-radius:48px;
-    padding:12px;
+    border-radius:28px;
+    padding:10px;
     background:linear-gradient(145deg, #243d2c, #040d07 35%, #132418 80%, #465a48);
-    border:3px solid #6c826e;
+    border:2px solid rgba(78, 186, 116, 0.4);
     box-shadow:
-        0 40px 100px rgba(0,0,0,0.9),
-        0 0 50px rgba(46, 232, 154, 0.25),
-        inset 0 0 0 2px #020604;
+        0 40px 100px rgba(0,0,0,0.95),
+        0 0 60px rgba(46, 232, 154, 0.22),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 .video-inner{
     position:relative;
-    border-radius:36px;
+    border-radius:20px;
     overflow:hidden;
     background:#030805;
-    line-height:0;
+    aspect-ratio:16 / 9;
+    box-shadow:inset 0 0 25px rgba(0,0,0,0.85);
+    display:flex;
+    align-items:center;
+    justify-content:center;
 }
 .video-inner video{
     width:100%;
-    height:auto;
+    height:100%;
+    object-fit:cover;
     display:block;
-    border-radius:36px;
+    border-radius:20px;
 }
 
 /* Floating Sound Bar on the Video */

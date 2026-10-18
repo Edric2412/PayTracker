@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Security
@@ -432,40 +430,6 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. About Card
-            item {
-                BotanicalGlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            BotanicalSquircleContainer(
-                                icon = Icons.Default.Info,
-                                tint = BotanicalEmerald,
-                                backgroundColor = Color(0x264EBA74),
-                                size = 36.dp,
-                                iconSize = 18.dp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Pay Tracker v1.0",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "• Powered by Botanical Glass design language\n• 100% private: SQLite Room database stored strictly on-device\n• Zero third-party telemetry or ad SDKs",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-            }
 
             item {
                 Spacer(modifier = Modifier.height(80.dp))

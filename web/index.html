@@ -30,7 +30,7 @@
     --glass: rgba(235,242,224,.07);
     --emerald: #2EE89A;
     --emerald-glow: rgba(46, 232, 154, 0.28);
-    --amber: #FFB74D;
+    --mint: #2EE89A;
     --red: #FF7B7B;
 }
 *{box-sizing:border-box}
@@ -89,7 +89,7 @@ button{font:inherit}
 .hero h1 em{font-weight:400;color:var(--leaf);font-style:italic}
 .lede{font-size:16px;line-height:1.8;color:#c9d1c5;max-width:465px}
 .cta-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:30px}
-.hero-art{height:650px;position:relative;display:flex;align-items:center;justify-content:center}
+.hero-art{height:610px;position:relative;display:flex;align-items:center;justify-content:center}
 .glow{position:absolute;width:400px;height:400px;border-radius:50%;background:#78935d25;filter:blur(40px)}
 .leafshape{position:absolute;color:#6e8752;opacity:.5;font-size:170px;filter:blur(.4px);transform:rotate(-28deg);right:-10px;top:35px}
 .leafshape.two{font-size:120px;left:3px;bottom:25px;transform:rotate(35deg);opacity:.32}
@@ -97,22 +97,22 @@ button{font:inherit}
 /* Real Phone Frame Matching the Android App */
 .phone{
     position:relative;
-    width:326px;
-    height:640px;
-    border:2.5px solid #5a705e;
-    border-radius:46px;
-    padding:10px;
-    background:linear-gradient(135deg,#1f3025,#040b07 28%,#0e1d14 75%,#3a4a3b);
-    box-shadow:0 35px 90px rgba(0,0,0,0.85),inset 0 0 0 2px #020604;
-    transform:rotate(4deg);
+    width:318px;
+    height:600px;
+    border:2px solid rgba(78, 186, 116, 0.28);
+    border-radius:44px;
+    padding:9px;
+    background:linear-gradient(145deg, #162a1e, #050e09 40%, #0d1a12 85%, #233a29);
+    box-shadow:0 30px 80px rgba(0,0,0,0.85), inset 0 0 0 2px rgba(0,0,0,0.85);
+    transform:rotate(3deg);
     z-index:1;
-    transition:transform 0.4s ease;
+    transition:transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .phone:hover{transform:rotate(0deg) scale(1.02)}
 .screen{
     height:100%;
-    border-radius:36px;
-    background:#09110D;
+    border-radius:35px;
+    background:#08130d;
     overflow:hidden;
     border:1px solid rgba(255,255,255,0.08);
     display:flex;
@@ -135,17 +135,17 @@ button{font:inherit}
     flex-shrink:0;
 }
 .status-time{letter-spacing:-0.2px}
-.status-icons{display:flex;align-items:center;gap:5px;font-size:9.5px}
+.status-icons{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#BAC5B6}
 
 /* Scrollable Screen Body (mirrors LazyColumn) */
 .phone-scroll-body{
     flex:1;
     overflow-y:auto;
     overflow-x:hidden;
-    padding:6px 13px 80px;
+    padding:8px 12px 68px;
     display:flex;
     flex-direction:column;
-    gap:11px;
+    gap:10px;
     scrollbar-width:none;
     -ms-overflow-style:none;
 }
@@ -156,20 +156,20 @@ button{font:inherit}
     display:flex;
     justify-content:space-between;
     align-items:center;
-    padding:2px 0 2px;
+    padding:1px 2px;
 }
-.app-header-title{font-size:17px;font-weight:700;color:#FFF;letter-spacing:-0.4px;line-height:1.2}
-.app-header-sub{font-size:10px;color:#8E9DA0;margin-top:1px}
+.app-header-title{font-size:16px;font-weight:700;color:#FFF;letter-spacing:-0.4px;line-height:1.2}
+.app-header-sub{font-size:9.5px;color:#8E9DA0;margin-top:1px}
 .bell-btn{
-    width:36px;
-    height:36px;
+    width:34px;
+    height:34px;
     border-radius:50%;
-    background:rgba(37,59,47,0.3);
-    border:1px solid rgba(255,255,255,0.18);
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.12);
     display:grid;
     place-items:center;
     position:relative;
-    color:#4EBA74;
+    color:#2EE89A;
 }
 .bell-dot{
     position:absolute;
@@ -178,7 +178,8 @@ button{font:inherit}
     width:6px;
     height:6px;
     border-radius:50%;
-    background:#F59E0B;
+    background:#2EE89A;
+    box-shadow:0 0 6px rgba(46, 232, 154, 0.6);
 }
 
 /* Month Bar (DashboardMonthSelector) */
@@ -195,7 +196,7 @@ button{font:inherit}
 }
 .month-arrow{
     color:#FFFFFF;
-    font-size:13px;
+    font-size:12px;
     opacity:0.9;
     padding:0 2px;
     cursor:pointer;
@@ -205,17 +206,17 @@ button{font:inherit}
     cursor:default;
 }
 .month-display{
-    font-size:12px;
+    font-size:11.5px;
     font-weight:700;
     color:#FFFFFF;
-    padding:0 4px;
+    padding:0 3px;
 }
 .this-month-pill{
-    background:#E8E5D8;
-    color:#141C15;
-    font-size:9.5px;
+    background:#EDE8DE;
+    color:#0A170F;
+    font-size:9px;
     font-weight:700;
-    padding:4px 9px;
+    padding:3px 8px;
     border-radius:999px;
     border:none;
     cursor:pointer;
@@ -223,40 +224,41 @@ button{font:inherit}
 
 /* Main KPI Card matching HeroSpendingVelocityCard in Compose */
 .real-kpi-card{
-    background:rgba(16, 28, 21, 0.85);
-    border:1px solid rgba(255, 255, 255, 0.14);
-    border-radius:20px;
-    padding:14px;
-    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+    background:linear-gradient(160deg, rgba(20, 38, 28, 0.75), rgba(10, 22, 15, 0.85));
+    border:1px solid rgba(255, 255, 255, 0.08);
+    border-radius:18px;
+    padding:13px 14px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.3);
 }
 .kpi-top-row{
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
 }
-.kpi-label{font-size:10.5px;color:#8E9DA0;font-weight:500}
+.kpi-label{font-size:9.5px;color:#8E9DA0;font-weight:600;letter-spacing:0.5px;text-transform:uppercase}
 .kpi-total{
-    font-size:26px;
+    font-size:25px;
     font-weight:700;
-    letter-spacing:-0.9px;
+    letter-spacing:-0.8px;
     color:#FFFFFF;
-    margin:3px 0;
+    margin:2px 0 3px;
     line-height:1.15;
 }
 .kpi-sub{
-    font-size:9.5px;
-    color:#4EBA74;
+    font-size:9px;
+    color:#2EE89A;
     font-weight:400;
     line-height:1.4;
 }
 .kpi-sub.net{
+    color:#4EBA74;
     font-weight:500;
 }
 .trend-badge{
-    font-size:9px;
-    background:rgba(37,59,47,0.35);
-    border:1px solid rgba(78,186,116,0.35);
-    color:#E8E5D8;
+    font-size:8.5px;
+    background:rgba(46, 232, 154, 0.12);
+    border:1px solid rgba(46, 232, 154, 0.28);
+    color:#2EE89A;
     padding:3px 8px;
     border-radius:999px;
     font-weight:600;
@@ -267,57 +269,63 @@ button{font:inherit}
 }
 /* Velocity Bar Chart */
 .velocity-chart{
-    margin-top:12px;
+    margin-top:11px;
 }
 .velocity-bars{
     display:flex;
     align-items:flex-end;
     justify-content:space-between;
-    height:44px;
-    gap:1.5px;
+    height:38px;
+    gap:2.5px;
     padding:0 1px;
 }
 .velocity-bar{
     flex:1;
-    min-width:3px;
+    min-width:4px;
     border-radius:3px;
-    background:#A0AF92;
+    background:#4EBA74;
+    opacity:0.85;
 }
-.velocity-bar.high{background:#E8E5D8;}
-.velocity-bar.zero{background:rgba(138, 155, 123, 0.25);height:3px !important;}
-.velocity-bar.future{background:rgba(138, 155, 123, 0.12);height:3px !important;}
+.velocity-bar.high{
+    background:#EDE8DE;
+    opacity:1;
+}
+.velocity-bar.future{
+    background:rgba(255, 255, 255, 0.08);
+    height:4px !important;
+}
 .velocity-labels{
     display:flex;
     justify-content:space-between;
-    font-size:8px;
+    font-size:7.5px;
     color:#8E9DA0;
     margin-top:5px;
     padding:0 2px;
 }
 .velocity-divider{
     height:1px;
-    background:rgba(255,255,255,0.08);
-    margin:9px 0 7px;
+    background:rgba(255,255,255,0.06);
+    margin:8px 0 6px;
 }
 .velocity-footer{
     display:flex;
     justify-content:space-between;
-    font-size:9.5px;
+    font-size:9px;
     color:#8E9DA0;
 }
 
 /* Action Buttons Row (ActionButtonsRow) */
 .action-buttons-row{
     display:flex;
-    gap:8px;
+    gap:7px;
 }
 .cream-btn{
     flex:1;
-    background:#E8E5D8;
-    color:#141C15;
-    font-size:10.5px;
+    background:#EDE8DE;
+    color:#0A170F;
+    font-size:10px;
     font-weight:700;
-    padding:9px 10px;
+    padding:8.5px 10px;
     border-radius:999px;
     border:none;
     display:flex;
@@ -328,12 +336,12 @@ button{font:inherit}
 }
 .glass-btn{
     flex:1;
-    background:rgba(37,59,47,0.3);
-    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(255, 255, 255, 0.06);
+    border:1px solid rgba(255, 255, 255, 0.12);
     color:#FFFFFF;
-    font-size:10.5px;
+    font-size:10px;
     font-weight:600;
-    padding:9px 10px;
+    padding:8.5px 10px;
     border-radius:999px;
     display:flex;
     align-items:center;
@@ -344,44 +352,45 @@ button{font:inherit}
 
 /* BotanicalBudgetCard */
 .budget-card{
-    background:rgba(16, 28, 21, 0.85);
-    border:1px solid rgba(255, 255, 255, 0.14);
-    border-radius:20px;
-    padding:12px 14px;
+    background:linear-gradient(160deg, rgba(20, 38, 28, 0.75), rgba(10, 22, 15, 0.85));
+    border:1px solid rgba(255, 255, 255, 0.08);
+    border-radius:18px;
+    padding:11px 13px;
 }
 .budget-top{
     display:flex;
     align-items:center;
-    gap:10px;
+    gap:9px;
 }
 .budget-squircle{
-    width:32px;
-    height:32px;
-    border-radius:10px;
-    background:rgba(37,59,47,0.4);
+    width:30px;
+    height:30px;
+    border-radius:9px;
+    background:rgba(46, 232, 154, 0.12);
+    border:1px solid rgba(46, 232, 154, 0.2);
     display:grid;
     place-items:center;
-    color:#E8E5D8;
+    color:#2EE89A;
     flex-shrink:0;
 }
 .budget-details{flex:1}
-.budget-title{font-size:9.5px;color:#8E9DA0}
-.budget-rem{font-size:12px;font-weight:700;color:#FFFFFF;margin-top:1px}
-.budget-sub{font-size:8.5px;color:#4EBA74;margin-top:1px}
+.budget-title{font-size:9px;color:#8E9DA0}
+.budget-rem{font-size:11.5px;font-weight:700;color:#FFFFFF;margin-top:1px}
+.budget-sub{font-size:8px;color:#4EBA74;margin-top:1px}
 .budget-stat{text-align:right}
-.budget-pct{font-size:11px;font-weight:700;color:#C4D1BA}
-.budget-max{font-size:9px;color:#8E9DA0;margin-top:1px}
+.budget-pct{font-size:10.5px;font-weight:700;color:#EDE8DE}
+.budget-max{font-size:8.5px;color:#8E9DA0;margin-top:1px}
 .budget-track{
     height:5px;
     border-radius:999px;
-    background:rgba(40,56,44,0.6);
-    margin-top:10px;
+    background:rgba(255, 255, 255, 0.08);
+    margin-top:9px;
     overflow:hidden;
 }
 .budget-fill{
     height:100%;
     border-radius:999px;
-    background:linear-gradient(90deg,#E8E5D8,#BDCBAE);
+    background:linear-gradient(90deg, #2EE89A, #EDE8DE);
 }
 
 /* ThreeStatCardsRow */
@@ -391,101 +400,33 @@ button{font:inherit}
     gap:6px;
 }
 .stat-card{
-    background:rgba(16, 28, 21, 0.85);
-    border:1px solid rgba(255, 255, 255, 0.12);
+    background:linear-gradient(160deg, rgba(20, 38, 28, 0.65), rgba(10, 22, 15, 0.75));
+    border:1px solid rgba(255, 255, 255, 0.07);
     border-radius:14px;
-    padding:10px 6px;
+    padding:9px 6px;
     text-align:center;
 }
-.stat-val{font-size:12px;font-weight:700;color:#FFFFFF}
-.stat-val.food{color:#A6854C}
-.stat-label{font-size:8.5px;color:#8E9DA0;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* BotanicalCategoryAllocationCard */
-.alloc-card{
-    background:rgba(16, 28, 21, 0.85);
-    border:1px solid rgba(255, 255, 255, 0.14);
-    border-radius:20px;
-    padding:12px 14px;
-}
-.alloc-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:10px;
-}
-.alloc-title{font-size:12px;font-weight:700;color:#FFFFFF}
-.alloc-link{font-size:9.5px;font-weight:600;color:#4EBA74;cursor:pointer}
-.alloc-content{
-    display:flex;
-    align-items:center;
-    gap:14px;
-}
-.donut-wrap{
-    position:relative;
-    width:76px;
-    height:76px;
-    flex-shrink:0;
-}
-.donut-wrap svg{
-    transform:rotate(-90deg);
-    width:100%;
-    height:100%;
-}
-.donut-center{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    text-align:center;
-}
-.donut-center-sub{font-size:7.5px;color:#8E9DA0;display:block}
-.donut-center-val{font-size:9.5px;font-weight:700;color:#FFFFFF;display:block}
-.alloc-legend{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-}
-.legend-item{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-size:9px;
-}
-.legend-left{
-    display:flex;
-    align-items:center;
-    gap:5px;
-    color:#FFFFFF;
-}
-.legend-dot{
-    width:6px;
-    height:6px;
-    border-radius:50%;
-}
-.legend-pct{
-    color:#8E9DA0;
-    font-weight:600;
-}
+.stat-val{font-size:11.5px;font-weight:700;color:#FFFFFF}
+.stat-val.food{color:#EDE8DE}
+.stat-label{font-size:8px;color:#8E9DA0;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Floating Bottom Navigation Bar (PayBottomNavigationBar) */
 .pay-bottom-nav{
     position:absolute;
-    bottom:10px;
+    bottom:9px;
     left:12px;
     right:12px;
-    height:50px;
+    height:46px;
     border-radius:999px;
-    background:rgba(12, 23, 17, 0.94);
-    border:1px solid rgba(255, 255, 255, 0.18);
-    backdrop-filter:blur(12px);
-    -webkit-backdrop-filter:blur(12px);
+    background:rgba(8, 19, 13, 0.94);
+    border:1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
     display:flex;
     align-items:center;
     justify-content:space-around;
     padding:0 8px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.6);
+    box-shadow:0 8px 24px rgba(0,0,0,0.55);
     z-index:25;
 }
 .nav-tab-item{
@@ -493,19 +434,20 @@ button{font:inherit}
     flex-direction:column;
     align-items:center;
     gap:2px;
-    color:#8E9DA0;
-    font-size:8px;
+    color:#7E9185;
+    font-size:7.5px;
     font-weight:500;
     position:relative;
     cursor:pointer;
-    padding:4px 6px;
+    padding:2px 6px;
 }
 .nav-tab-item.active{
     color:#FFFFFF;
     font-weight:700;
 }
 .nav-tab-item.active svg{
-    color:#FFFFFF;
+    color:#2EE89A;
+    fill:#2EE89A;
 }
 .nav-tab-icon-wrap{
     position:relative;
@@ -516,8 +458,8 @@ button{font:inherit}
     position:absolute;
     top:-3px;
     right:-7px;
-    background:#F59E0B;
-    color:#000000;
+    background:#2EE89A;
+    color:#07120C;
     font-size:7px;
     font-weight:800;
     min-width:12px;
@@ -536,17 +478,17 @@ button{font:inherit}
     bottom:40px;
     left:-10px;
     width:190px;
-    padding:15px;
-    border:1px solid #b8c9a53a;
+    padding:14px 16px;
+    border:1px solid rgba(78, 186, 116, 0.25);
     border-radius:18px;
-    background:rgba(16,43,29,.9);
+    background:rgba(10, 24, 16, 0.92);
     backdrop-filter:blur(16px);
-    box-shadow:0 20px 45px #0007;
+    box-shadow:0 20px 45px rgba(0,0,0,0.55);
     transform:rotate(-4deg);
 }
-.float-title{font-size:9px;color:#a9b99a;text-transform:uppercase;letter-spacing:0.5px}
-.float-value{font-family:Georgia,serif;font-size:22px;margin:6px 0;color:#86d5ff}
-.float-sub{font-size:9.5px;color:#bac8b2}
+.float-title{font-size:8.5px;color:#8E9DA0;text-transform:uppercase;letter-spacing:0.6px;font-weight:600}
+.float-value{font-family:Georgia,serif;font-size:22px;margin:5px 0;color:#2EE89A}
+.float-sub{font-size:9.5px;color:#BAC8B2}
 
 /* Section: Features */
 .section{padding:95px 0}
@@ -730,8 +672,8 @@ button{font:inherit}
 /* Responsive */
 @media(max-width:850px){
     .hero{grid-template-columns:1fr;gap:0;padding-top:55px}
-    .hero-art{height:630px;margin-top:15px}
-    .phone{transform:rotate(2deg) scale(.92);transform-origin:center}
+    .hero-art{height:590px;margin-top:15px}
+    .phone{transform:rotate(2deg) scale(.9);transform-origin:center}
     .floating{left:3%;bottom:25px}
     .features{grid-template-columns:repeat(2,1fr)}
     .showgrid{grid-template-columns:1fr;gap:35px}
@@ -751,9 +693,9 @@ button{font:inherit}
     .hero h1{font-size:54px;letter-spacing:-2.8px}
     .lede{font-size:14px}
     .cta-row .btn{width:100%}
-    .hero-art{height:560px;margin-top:12px}
-    .phone{transform:rotate(2deg) scale(.82);transform-origin:center}
-    .floating{left:0;bottom:15px;transform:scale(.8) rotate(-4deg);transform-origin:left bottom}
+    .hero-art{height:520px;margin-top:10px}
+    .phone{transform:rotate(2deg) scale(.8);transform-origin:center}
+    .floating{left:0;bottom:15px;transform:scale(.78) rotate(-4deg);transform-origin:left bottom}
     .leafshape{font-size:120px}
     .section{padding:65px 0}
     .section h2{font-size:38px}
@@ -850,16 +792,16 @@ button{font:inherit}
                     </div>
                 </div>
 
-                <!-- Scrollable lazy dashboard content (mirrors LazyColumn in Compose) -->
+                <!-- Scrollable screen body (mirrors LazyColumn) -->
                 <div class="phone-scroll-body">
-                    <!-- 1. Botanical Header Top Bar (DashboardHeaderRow) -->
+                    <!-- 1. Header Top Bar (DashboardHeaderRow) -->
                     <div class="app-header-row">
                         <div>
                             <div class="app-header-title">Pay Tracker</div>
                             <div class="app-header-sub">Track smarter. Spend better.</div>
                         </div>
                         <div class="bell-btn" title="Review notifications">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                             </svg>
@@ -882,12 +824,12 @@ button{font:inherit}
                         <div class="kpi-top-row">
                             <div>
                                 <div class="kpi-label">Total Spent</div>
-                                <div class="kpi-total">&#x20B9;18,420<span style="font-size:15px;color:#98b3a1;font-weight:500">.00</span></div>
+                                <div class="kpi-total">&#x20B9;18,420<span style="font-size:14px;color:#8E9DA0;font-weight:500">.00</span></div>
                                 <div class="kpi-sub">Received: +&#x20B9;32,000.00</div>
                                 <div class="kpi-sub net">Net Cash Flow: +&#x20B9;13,580.00</div>
                             </div>
                             <div class="trend-badge">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
                                     <polyline points="17 18 23 18 23 12"></polyline>
                                 </svg>
@@ -895,48 +837,32 @@ button{font:inherit}
                             </div>
                         </div>
 
-                        <!-- 31 Velocity Daily Spend Bars -->
+                        <!-- Clean 16-Bar Velocity Chart -->
                         <div class="velocity-chart">
                             <div class="velocity-bars" title="Daily spending velocity">
                                 <div class="velocity-bar" style="height:35%"></div>
-                                <div class="velocity-bar" style="height:18%"></div>
                                 <div class="velocity-bar" style="height:55%"></div>
                                 <div class="velocity-bar high" style="height:88%"></div>
                                 <div class="velocity-bar" style="height:42%"></div>
-                                <div class="velocity-bar" style="height:25%"></div>
-                                <div class="velocity-bar" style="height:60%"></div>
-                                <div class="velocity-bar" style="height:30%"></div>
+                                <div class="velocity-bar" style="height:62%"></div>
                                 <div class="velocity-bar high" style="height:92%"></div>
-                                <div class="velocity-bar" style="height:48%"></div>
-                                <div class="velocity-bar" style="height:20%"></div>
-                                <div class="velocity-bar zero" style="height:6%"></div>
+                                <div class="velocity-bar" style="height:25%"></div>
                                 <div class="velocity-bar" style="height:70%"></div>
-                                <div class="velocity-bar" style="height:38%"></div>
                                 <div class="velocity-bar high" style="height:100%"></div>
                                 <div class="velocity-bar" style="height:52%"></div>
-                                <div class="velocity-bar" style="height:28%"></div>
-                                <div class="velocity-bar" style="height:64%"></div>
+                                <div class="velocity-bar" style="height:65%"></div>
+                                <div class="velocity-bar high" style="height:80%"></div>
                                 <div class="velocity-bar" style="height:45%"></div>
-                                <div class="velocity-bar" style="height:32%"></div>
-                                <div class="velocity-bar high" style="height:82%"></div>
-                                <div class="velocity-bar" style="height:40%"></div>
-                                <div class="velocity-bar" style="height:22%"></div>
-                                <div class="velocity-bar zero" style="height:6%"></div>
                                 <div class="velocity-bar" style="height:58%"></div>
-                                <div class="velocity-bar" style="height:46%"></div>
-                                <div class="velocity-bar" style="height:34%"></div>
-                                <div class="velocity-bar high" style="height:76%"></div>
-                                <div class="velocity-bar future" style="height:4%"></div>
-                                <div class="velocity-bar future" style="height:4%"></div>
-                                <div class="velocity-bar future" style="height:4%"></div>
+                                <div class="velocity-bar future" style="height:5%"></div>
+                                <div class="velocity-bar future" style="height:5%"></div>
                             </div>
                             <div class="velocity-labels">
                                 <span>1</span>
-                                <span>5</span>
-                                <span>10</span>
-                                <span>15</span>
-                                <span>20</span>
-                                <span>25</span>
+                                <span>7</span>
+                                <span>14</span>
+                                <span>21</span>
+                                <span>28</span>
                                 <span>31</span>
                             </div>
                             <div class="velocity-divider"></div>
@@ -970,14 +896,14 @@ button{font:inherit}
                     <div class="budget-card">
                         <div class="budget-top">
                             <div class="budget-squircle">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V6h14v8h2zm-7-3c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm8 4h-2.5c-.28 0-.5.22-.5.5v3c0 .28.22.5.5.5H20c1.1 0 2-.9 2-2v-1c0-.55-.45-1-1-1z"/>
                                 </svg>
                             </div>
                             <div class="budget-details">
                                 <div class="budget-title">Monthly Budget</div>
                                 <div class="budget-rem">&#x20B9;5,580 remaining</div>
-                                <div class="budget-sub">Net left: &#x20B9;7,580 (after +&#x20B9;2,000 refunds)</div>
+                                <div class="budget-sub">Net left: &#x20B9;7,580 (after refunds)</div>
                             </div>
                             <div class="budget-stat">
                                 <div class="budget-pct">76% used</div>
@@ -997,47 +923,11 @@ button{font:inherit}
                         </div>
                         <div class="stat-card">
                             <div class="stat-val food">Food</div>
-                            <div class="stat-label">Top: 34%</div>
+                            <div class="stat-label">Top Category</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-val">&#x20B9;4,250</div>
                             <div class="stat-label">Peak spend</div>
-                        </div>
-                    </div>
-
-                    <!-- 7. Category Allocation Card with Donut Chart (BotanicalCategoryAllocationCard) -->
-                    <div class="alloc-card">
-                        <div class="alloc-header">
-                            <span class="alloc-title">Category Allocation</span>
-                            <span class="alloc-link">View all</span>
-                        </div>
-                        <div class="alloc-content">
-                            <div class="donut-wrap">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12"></circle>
-                                    <!-- Food 34% -->
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="#A6854C" stroke-width="12" stroke-dasharray="77 150" stroke-dashoffset="0"></circle>
-                                    <!-- Groceries 22% -->
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="#7E9C75" stroke-width="12" stroke-dasharray="50 177" stroke-dashoffset="-77"></circle>
-                                    <!-- Shopping 18% -->
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="#DE4568" stroke-width="12" stroke-dasharray="41 186" stroke-dashoffset="-127"></circle>
-                                    <!-- Bills 14% -->
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="#C4C59E" stroke-width="12" stroke-dasharray="32 195" stroke-dashoffset="-168"></circle>
-                                    <!-- Entertainment 12% -->
-                                    <circle cx="50" cy="50" r="36" fill="none" stroke="#8B6B84" stroke-width="12" stroke-dasharray="27 200" stroke-dashoffset="-200"></circle>
-                                </svg>
-                                <div class="donut-center">
-                                    <span class="donut-center-sub">Total</span>
-                                    <span class="donut-center-val">&#x20B9;18,420</span>
-                                </div>
-                            </div>
-                            <div class="alloc-legend">
-                                <div class="legend-item"><div class="legend-left"><span class="legend-dot" style="background:#A6854C"></span><span>Food</span></div><span class="legend-pct">34%</span></div>
-                                <div class="legend-item"><div class="legend-left"><span class="legend-dot" style="background:#7E9C75"></span><span>Groceries</span></div><span class="legend-pct">22%</span></div>
-                                <div class="legend-item"><div class="legend-left"><span class="legend-dot" style="background:#DE4568"></span><span>Shopping</span></div><span class="legend-pct">18%</span></div>
-                                <div class="legend-item"><div class="legend-left"><span class="legend-dot" style="background:#C4C59E"></span><span>Bills</span></div><span class="legend-pct">14%</span></div>
-                                <div class="legend-item"><div class="legend-left"><span class="legend-dot" style="background:#8B6B84"></span><span>Entertainment</span></div><span class="legend-pct">12%</span></div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1045,7 +935,7 @@ button{font:inherit}
                 <!-- Floating Bottom Navigation Bar (PayBottomNavigationBar in Compose) -->
                 <div class="pay-bottom-nav">
                     <div class="nav-tab-item active">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
                             <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
                             <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
@@ -1055,7 +945,7 @@ button{font:inherit}
                     </div>
                     <div class="nav-tab-item">
                         <div class="nav-tab-icon-wrap">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                             </svg>
@@ -1064,14 +954,14 @@ button{font:inherit}
                         <span>Review</span>
                     </div>
                     <div class="nav-tab-item">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
                         <span>History</span>
                     </div>
                     <div class="nav-tab-item">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>

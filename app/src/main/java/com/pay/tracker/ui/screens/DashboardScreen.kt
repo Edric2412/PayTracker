@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,18 +64,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -88,6 +95,12 @@ import com.pay.tracker.core.model.TransactionDirection
 import com.pay.tracker.core.model.TransactionClassification
 import com.pay.tracker.core.sms.SmsImportResult
 import com.pay.tracker.ui.components.AppWalkthroughSpotlightOverlay
+import com.pay.tracker.ui.components.TOUR_BUDGET
+import com.pay.tracker.ui.components.TOUR_CASH_FLOW
+import com.pay.tracker.ui.components.TOUR_CATEGORIES
+import com.pay.tracker.ui.components.TOUR_MONTH
+import com.pay.tracker.ui.components.TOUR_REVIEW
+import com.pay.tracker.ui.components.TOUR_SCAN
 import com.pay.tracker.ui.components.BotanicalCreamButton
 import com.pay.tracker.ui.components.BotanicalGlassButton
 import com.pay.tracker.ui.components.BotanicalGlassCard
@@ -145,6 +158,27 @@ fun DashboardScreen(
     val cashFlowMetrics by viewModel.cashFlowMetrics.collectAsState()
     val peakExpense by viewModel.peakExpense.collectAsState()
 
+    val dashboardListState = rememberLazyListState()
+    var walkthroughStep by remember { mutableIntStateOf(0) }
+    val tourTargets = remember { mutableStateMapOf<Int, Rect>() }
+    val hasAnnualSpend = yearlySpendSummaries.isNotEmpty()
+    val walkthroughTargetItem = when (walkthroughStep) {
+        TOUR_REVIEW -> 1
+        TOUR_MONTH -> 2
+        TOUR_CASH_FLOW -> 3
+        TOUR_SCAN -> if (hasAnnualSpend) 5 else 4
+        TOUR_BUDGET -> if (hasAnnualSpend) 6 else 5
+        else -> if (hasAnnualSpend) 8 else 7
+    }
+
+    LaunchedEffect(showWalkthrough, walkthroughStep, walkthroughTargetItem) {
+        if (showWalkthrough) {
+            // Remove the previous position until the new target has been laid out.
+            tourTargets.remove(walkthroughStep)
+            dashboardListState.animateScrollToItem(walkthroughTargetItem)
+        }
+    }
+
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var showEditBudgetDialog by remember { mutableStateOf(false) }
     var showScanOptionDialog by remember { mutableStateOf(false) }
@@ -174,6 +208,7 @@ fun DashboardScreen(
             containerColor = Color.Transparent
         ) { innerPadding ->
         LazyColumn(
+            state = dashboardListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -186,35 +221,53 @@ fun DashboardScreen(
 
             // 1. Botanical Header Top Bar
             item {
-                DashboardHeaderRow(
-                    pendingCount = pendingCount,
-                    onBellClick = onNavigateToReview
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_REVIEW] = it.boundsInRoot() }
+                ) {
+                    DashboardHeaderRow(
+                        pendingCount = pendingCount,
+                        onBellClick = onNavigateToReview
+                    )
+                }
             }
 
             // 2. Month Selector Navigation Bar
             item {
-                DashboardMonthSelector(
-                    selectedMonth = selectedYearMonth,
-                    onPreviousMonth = { viewModel.previousMonth() },
-                    onNextMonth = { viewModel.nextMonth() },
-                    onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() }
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_MONTH] = it.boundsInRoot() }
+                ) {
+                    DashboardMonthSelector(
+                        selectedMonth = selectedYearMonth,
+                        onPreviousMonth = { viewModel.previousMonth() },
+                        onNextMonth = { viewModel.nextMonth() },
+                        onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() }
+                    )
+                }
             }
 
             // 3. Hero Spending Card with Velocity Bar Chart
             item {
-                HeroSpendingVelocityCard(
-                    total = monthlyTotal,
-                    dailyAverage = monthDailyAverage,
-                    currentDay = budgetPacing.currentDayOfMonth,
-                    totalDays = budgetPacing.totalDaysInMonth,
-                    dailySpends = monthDailySpendHistory,
-                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
-                    previousMonthTotal = previousMonthTotal,
-                    incomeReceived = cashFlowMetrics.incomeReceived,
-                    netCashFlow = cashFlowMetrics.netCashFlow
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_CASH_FLOW] = it.boundsInRoot() }
+                ) {
+                    HeroSpendingVelocityCard(
+                        total = monthlyTotal,
+                        dailyAverage = monthDailyAverage,
+                        currentDay = budgetPacing.currentDayOfMonth,
+                        totalDays = budgetPacing.totalDaysInMonth,
+                        dailySpends = monthDailySpendHistory,
+                        isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                        previousMonthTotal = previousMonthTotal,
+                        incomeReceived = cashFlowMetrics.incomeReceived,
+                        netCashFlow = cashFlowMetrics.netCashFlow
+                    )
+                }
             }
 
             // 3b. Quick Monthly Spend by Year Overview Banner
@@ -232,21 +285,28 @@ fun DashboardScreen(
                 ActionButtonsRow(
                     onAddExpenseClick = { showAddExpenseSheet = true },
                     onScanSmsClick = onScanSmsClick,
-                    isImporting = isImporting
+                    isImporting = isImporting,
+                    onScanTargetMeasured = { tourTargets[TOUR_SCAN] = it }
                 )
             }
 
             // 5. Monthly Budget Fuel Gauge Card
             item {
-                BotanicalBudgetCard(
-                    pacing = budgetPacing,
-                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
-                    onEditBudgetClick = {
-                        if (selectedYearMonth.isCurrentMonth) {
-                            showEditBudgetDialog = true
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_BUDGET] = it.boundsInRoot() }
+                ) {
+                    BotanicalBudgetCard(
+                        pacing = budgetPacing,
+                        isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                        onEditBudgetClick = {
+                            if (selectedYearMonth.isCurrentMonth) {
+                                showEditBudgetDialog = true
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
 
             // 6. 3-Stat Metric Cards Row: Transactions, Top Category, Peak Expense
@@ -261,11 +321,17 @@ fun DashboardScreen(
 
             // 7. Category Allocation Card with Donut Chart and Legend
             item {
-                BotanicalCategoryAllocationCard(
-                    categoryBreakdown = categoryBreakdown,
-                    totalSpend = monthlyTotal,
-                    onViewAllClick = onNavigateToHistory
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_CATEGORIES] = it.boundsInRoot() }
+                ) {
+                    BotanicalCategoryAllocationCard(
+                        categoryBreakdown = categoryBreakdown,
+                        totalSpend = monthlyTotal,
+                        onViewAllClick = onNavigateToHistory
+                    )
+                }
             }
 
             item {
@@ -332,7 +398,16 @@ fun DashboardScreen(
 
     if (showWalkthrough) {
         AppWalkthroughSpotlightOverlay(
-            onDismiss = { viewModel.dismissWalkthrough() }
+            stepIndex = walkthroughStep,
+            targetBounds = tourTargets[walkthroughStep],
+            onStepChange = { nextStep ->
+                walkthroughStep = nextStep
+                tourTargets.remove(nextStep)
+            },
+            onDismiss = {
+                walkthroughStep = 0
+                viewModel.dismissWalkthrough()
+            }
         )
     }
     }
@@ -718,7 +793,8 @@ private fun HeroSpendingVelocityCard(
 private fun ActionButtonsRow(
     onAddExpenseClick: () -> Unit,
     onScanSmsClick: () -> Unit,
-    isImporting: Boolean
+    isImporting: Boolean,
+    onScanTargetMeasured: (Rect) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -735,7 +811,9 @@ private fun ActionButtonsRow(
             onClick = onScanSmsClick,
             icon = Icons.Default.Download,
             enabled = !isImporting,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .onGloballyPositioned { onScanTargetMeasured(it.boundsInRoot()) }
         )
     }
 }
@@ -1620,6 +1698,7 @@ private fun AnnualSpendBreakdownBanner(
 /**
  * Scan SMS Options Dialog
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScanSmsOptionsDialog(
     selectedMonthName: String,
@@ -1627,110 +1706,189 @@ private fun ScanSmsOptionsDialog(
     onScanThisMonth: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xF0101D16),
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    tint = BotanicalEmerald,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Scan SMS Transactions",
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 18.sp
-                )
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "Extract completed debit transactions from your bank and UPI SMS alerts.",
-                    fontSize = 13.sp,
-                    color = BotanicalTextSecondary
-                )
-
-                // Option 1: Scan All History (Recommended)
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF0E1B14),
+        contentColor = Color(0xFFF1EEE5),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .size(width = 38.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF51614B))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
                 Surface(
-                    onClick = onScanAllHistory,
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0x33104F32),
-                    border = BorderStroke(1.5.dp, BotanicalEmerald),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF23382A),
+                    border = BorderStroke(1.dp, Color(0xFF465A40)),
+                    modifier = Modifier.size(50.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Scan All Historical SMS",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = BotanicalEmerald
-                            ) {
-                                Text(
-                                    text = "Recommended",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0A150F),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Scans all previous transactions across all months and years. Automatically calculates money spent for each month in each year.",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 16.sp
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = Color(0xFFD2DDBD),
+                            modifier = Modifier.size(23.dp)
                         )
                     }
                 }
-
-                // Option 2: Current Month Only
-                Surface(
-                    onClick = onScanThisMonth,
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0x33253B2F),
-                    border = BorderStroke(1.dp, Color(0x26FFFFFF)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Scan This Month Only",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Only scans SMS received in $selectedMonthName.",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 16.sp
-                        )
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Import transactions",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFF1EEE5)
+                    )
+                    Text(
+                        text = "Choose how much message history to check.",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = Color(0xFFB6C1B3)
+                    )
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = BotanicalTextSecondary)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color(0xFF283A2C))
+            )
+
+            SmsScanChoice(
+                number = "01",
+                title = "Scan all history",
+                description = "Look through older messages too, so past transactions can appear in their original months.",
+                detail = "Best for first setup",
+                onClick = onScanAllHistory
+            )
+
+            SmsScanChoice(
+                number = "02",
+                title = "Scan this month",
+                description = "Check messages dated within $selectedMonthName. A quicker option for refreshing the current view.",
+                detail = "Current month only",
+                onClick = onScanThisMonth
+            )
+
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF15261B),
+                border = BorderStroke(1.dp, Color(0xFF2C4030))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = Color(0xFFB9C89B),
+                        modifier = Modifier
+                            .padding(top = 1.dp)
+                            .size(17.dp)
+                    )
+                    Text(
+                        text = "Only recognised message patterns are imported. Review suggested entries afterwards, and grant SMS access only if you're comfortable.",
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = Color(0xFFB6C1B3)
+                    )
+                }
+            }
+
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Not now", color = Color(0xFFD7DECF), fontWeight = FontWeight.Medium)
             }
         }
-    )
+    }
+}
+
+@Composable
+private fun SmsScanChoice(
+    number: String,
+    title: String,
+    description: String,
+    detail: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFF17281D),
+        border = BorderStroke(1.dp, Color(0xFF3D503B)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF263C2B),
+                modifier = Modifier.size(43.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = number,
+                        color = Color(0xFFD2DDBD),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFF1EEE5)
+                )
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = Color(0xFFB6C1B3)
+                )
+                Text(
+                    text = detail,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFB9C89B)
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Select $title",
+                tint = Color(0xFFB9C89B),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
 }
 
 /**

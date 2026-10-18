@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -45,6 +46,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,9 +67,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.pay.tracker.core.security.BiometricAuthManager
 import com.pay.tracker.core.sms.SmsImportResult
 import com.pay.tracker.ui.components.BotanicalCreamButton
 import com.pay.tracker.ui.components.BotanicalGlassButton
@@ -94,6 +99,8 @@ fun SettingsScreen(
 
     val isNotificationAccessGranted by viewModel.isNotificationAccessGranted.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    val isBiometricLockEnabled by viewModel.isBiometricLockEnabled.collectAsState()
+    val isBiometricHardwareAvailable = remember { viewModel.isBiometricHardwareAvailable(context) }
     val importResult by viewModel.importState.collectAsState()
     val isImporting by viewModel.isImporting.collectAsState()
     val isResetDone by viewModel.isResetDone.collectAsState()
@@ -265,7 +272,98 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Data & Tools Section
+            // 2. Security & Privacy Section
+            item {
+                Text(
+                    text = "Security & Privacy",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BotanicalTextSecondary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                )
+
+                BotanicalGlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            BotanicalSquircleContainer(
+                                icon = Icons.Default.Fingerprint,
+                                tint = if (isBiometricLockEnabled) BotanicalEmerald else Color(0xFF64B5F6),
+                                backgroundColor = if (isBiometricLockEnabled) Color(0x264EBA74) else Color(0x2664B5F6),
+                                size = 42.dp,
+                                iconSize = 22.dp
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Biometric & PIN Lock",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isBiometricHardwareAvailable) {
+                                        if (isBiometricLockEnabled) "Active on cold launch" else "Disabled"
+                                    } else {
+                                        "No screen lock enrolled"
+                                    },
+                                    fontSize = 12.sp,
+                                    color = if (isBiometricLockEnabled) BotanicalEmerald else BotanicalTextSecondary
+                                )
+                            }
+
+                            Switch(
+                                checked = isBiometricLockEnabled,
+                                enabled = isBiometricHardwareAvailable,
+                                onCheckedChange = { shouldEnable ->
+                                    if (shouldEnable) {
+                                        val activity = context as? FragmentActivity
+                                        if (activity != null) {
+                                            BiometricAuthManager.authenticate(
+                                                activity = activity,
+                                                title = "Enable App Lock",
+                                                subtitle = "Verify fingerprint or device PIN to confirm",
+                                                onSuccess = {
+                                                    viewModel.setBiometricLockEnabled(true)
+                                                }
+                                            )
+                                        } else {
+                                            viewModel.setBiometricLockEnabled(true)
+                                        }
+                                    } else {
+                                        viewModel.setBiometricLockEnabled(false)
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = BotanicalEmerald,
+                                    uncheckedThumbColor = Color(0xFFAAAAAA),
+                                    uncheckedTrackColor = Color(0x33FFFFFF)
+                                )
+                            )
+                        }
+
+                        Text(
+                            text = "Requires your fingerprint, face, or device PIN to view transactions when opening Pay Tracker fresh.",
+                            fontSize = 12.sp,
+                            color = BotanicalTextSecondary,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+
+            // 3. Data & Tools Section
             item {
                 Text(
                     text = "Data & Tools",

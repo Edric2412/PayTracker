@@ -39,6 +39,18 @@ class SettingsViewModel(
     private val _isResetDone = MutableStateFlow(false)
     val isResetDone: StateFlow<Boolean> = _isResetDone.asStateFlow()
 
+    private val _isBiometricLockEnabled = MutableStateFlow(prefs.getBoolean(KEY_BIOMETRIC_LOCK, false))
+    val isBiometricLockEnabled: StateFlow<Boolean> = _isBiometricLockEnabled.asStateFlow()
+
+    fun isBiometricHardwareAvailable(context: Context): Boolean {
+        return com.pay.tracker.core.security.BiometricAuthManager.canAuthenticate(context)
+    }
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
+        _isBiometricLockEnabled.value = enabled
+    }
+
     fun clearAllTransactions() {
         val repo = repository ?: return
         viewModelScope.launch {
@@ -120,5 +132,15 @@ class SettingsViewModel(
             return powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: true
         }
         return true
+    }
+
+    companion object {
+        const val PREFS_NAME = "pay_tracker_prefs"
+        const val KEY_BIOMETRIC_LOCK = "pref_biometric_lock_enabled"
+
+        fun isBiometricLockEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getBoolean(KEY_BIOMETRIC_LOCK, false)
+        }
     }
 }

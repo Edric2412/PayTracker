@@ -13,15 +13,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.pay.tracker.core.notification.NotificationHelper
+import com.pay.tracker.core.security.BiometricAuthManager
 import com.pay.tracker.ui.PayApp
+import com.pay.tracker.ui.screens.LockScreen
 import com.pay.tracker.ui.theme.PayTheme
 import com.pay.tracker.ui.viewmodel.PayViewModelFactory
+import com.pay.tracker.ui.viewmodel.SettingsViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var viewModelFactory: PayViewModelFactory
     private var initialRoute by mutableStateOf<String?>(null)
+    private var isAppUnlocked by mutableStateOf(true)
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -32,6 +37,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val isLockEnabled = SettingsViewModel.isBiometricLockEnabled(applicationContext)
+        isAppUnlocked = !isLockEnabled
 
         // Initialize high-priority notification channel
         NotificationHelper.createNotificationChannel(applicationContext)
@@ -45,12 +53,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PayTheme {
-                PayApp(
-                    viewModelFactory = viewModelFactory,
-                    initialRoute = initialRoute
-                )
+                if (!isAppUnlocked) {
+                    LockScreen(
+                        onUnlockRequested = { promptBiometricUnlock() }
+                    )
+                } else {
+                    PayApp(
+                        viewModelFactory = viewModelFactory,
+                        initialRoute = initialRoute
+                    )
+                }
             }
         }
+    }
+
+    private fun promptBiometricUnlock() {
+        BiometricAuthManager.authenticate(
+            activity = this,
+            onSuccess = {
+                isAppUnlocked = true
+            },
+            onError = { _, _ -> },
+            onFailed = { }
+        )
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -659,97 +659,95 @@ button{font:inherit}
 .detail{font-size:12px;color:#dce2d4}
 .detail small{display:block;color:#94a48c;margin-top:3px}
 
-/* Sideloading & Permissions Guide */
-.sideload-guide-card{
-    margin-top:24px;
-    background:linear-gradient(160deg, rgba(16, 36, 26, 0.85), rgba(8, 19, 13, 0.95));
-    border:1px solid rgba(46, 232, 154, 0.22);
+/* Install & permissions guide */
+.setup-guide{
+    margin-top:28px;
+    padding:clamp(24px,4vw,42px);
+    border:1px solid rgba(170,184,139,.26);
     border-radius:24px;
-    padding:30px 32px;
-    box-shadow:0 16px 45px rgba(0,0,0,0.45);
+    background:linear-gradient(135deg,rgba(19,43,30,.92),rgba(10,29,21,.78));
 }
-.guide-header{
-    display:flex;
-    align-items:flex-start;
-    gap:16px;
-    margin-bottom:22px;
-}
-.guide-icon{
-    width:42px;
-    height:42px;
-    border-radius:12px;
-    background:rgba(46, 232, 154, 0.12);
-    border:1px solid rgba(46, 232, 154, 0.25);
+.setup-guide-head{
     display:grid;
-    place-items:center;
-    color:var(--emerald);
-    flex-shrink:0;
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);
+    gap:34px;
+    align-items:end;
+    padding-bottom:30px;
 }
-.guide-title{
-    font-size:18px;
-    font-weight:700;
-    color:#FFFFFF;
-    margin:0 0 4px;
-    letter-spacing:-0.3px;
+.setup-guide .eyebrow{font-size:10px;letter-spacing:2px}
+.setup-guide h3{
+    font-family:Georgia,'Times New Roman',serif;
+    font-weight:400;
+    font-size:clamp(30px,3.6vw,42px);
+    letter-spacing:-1.2px;
+    line-height:1.08;
+    margin:12px 0 0;
+    color:var(--cream);
+    max-width:340px;
 }
-.guide-subtitle{
+.setup-guide-intro{
+    color:#bac6b6;
     font-size:13px;
-    color:#A9B9B0;
+    line-height:1.8;
     margin:0;
-    line-height:1.6;
+    max-width:440px;
 }
-.guide-steps-grid{
+.setup-steps{border-top:1px solid rgba(219,228,207,.14)}
+.setup-step{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
-    gap:16px;
+    grid-template-columns:46px minmax(0,1fr) minmax(95px,auto);
+    gap:17px;
+    align-items:start;
+    padding:21px 0;
+    border-bottom:1px solid rgba(219,228,207,.14);
 }
-.guide-step{
-    background:rgba(255, 255, 255, 0.03);
-    border:1px solid rgba(255, 255, 255, 0.08);
-    border-radius:16px;
-    padding:18px;
-    display:flex;
-    flex-direction:column;
+.setup-step:last-child{border-bottom:0;padding-bottom:3px}
+.setup-number{
+    font-family:Georgia,'Times New Roman',serif;
+    font-size:23px;
+    line-height:1.1;
+    color:#aab88b;
+    padding-top:1px;
 }
-.step-num{
-    font-size:10.5px;
-    font-weight:700;
-    letter-spacing:0.5px;
-    text-transform:uppercase;
-    color:var(--emerald);
-    margin-bottom:6px;
-}
-.guide-step h4{
+.setup-step h4{
+    color:#f1eee5;
     font-size:14px;
     font-weight:600;
-    color:#FFFFFF;
-    margin:0 0 8px;
+    letter-spacing:-.1px;
+    margin:0 0 7px;
 }
-.guide-step p{
+.setup-step p{
+    color:#b9c5b7;
     font-size:12px;
-    color:#98A79F;
-    line-height:1.6;
-    margin:0 0 12px;
-    flex:1;
+    line-height:1.75;
+    margin:0;
+    max-width:620px;
 }
-.step-tip{
-    background:rgba(46, 232, 154, 0.08);
-    border:1px solid rgba(46, 232, 154, 0.16);
-    border-radius:10px;
-    padding:10px 12px;
-    font-size:11.5px;
-    color:#D2E2D8;
-    line-height:1.55;
+.setup-label{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    justify-self:end;
+    padding:7px 10px;
+    border:1px solid rgba(170,184,139,.24);
+    border-radius:999px;
+    color:#c7d0b6;
+    font-size:10px;
+    line-height:1.2;
+    white-space:nowrap;
 }
-.step-tip strong{
-    color:#FFFFFF;
+@media(max-width:850px){
+    .setup-guide-head{grid-template-columns:1fr;gap:14px}
+    .setup-step{grid-template-columns:35px minmax(0,1fr);gap:12px}
+    .setup-label{grid-column:2;justify-self:start;margin-top:-3px}
 }
-.step-tip code{
-    background:rgba(0,0,0,0.35);
-    padding:1px 5px;
-    border-radius:4px;
-    font-size:10.5px;
-    color:var(--emerald);
+@media(max-width:560px){
+    .setup-guide{padding:24px 20px}
+    .setup-guide-head{padding-bottom:22px}
+    .setup-step{padding:19px 0;gap:10px}
+    .setup-number{font-size:20px}
+    .setup-step p{font-size:12px}
+    .setup-label{font-size:10px}
 }
 
 /* FAQ Section */
@@ -1254,63 +1252,53 @@ button{font:inherit}
             <div class="detail">Distribution<small>Direct APK &bull; 100% Free</small></div>
         </div>
     </div>
-
-    <!-- Sideloading & Android 13+ Permissions Guide -->
-    <div class="sideload-guide-card">
-        <div class="guide-header">
-            <div class="guide-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                </svg>
-            </div>
-            <div>
-                <h3 class="guide-title">Sideloading &amp; Permissions Guide (Android 13, 14 &amp; 15)</h3>
-                <p class="guide-subtitle">Pay Tracker is 100% private, open-source, and has zero internet permissions. Follow these simple steps for setup:</p>
-            </div>
-        </div>
-
-        <div class="guide-steps-grid">
-            <div class="guide-step">
-                <div class="step-num">Step 1</div>
-                <h4>Google Play Protect Notice</h4>
-                <p>When downloading directly from GitHub, Android or Google Play Protect may show <em>"Unrecognized App"</em> or <em>"Blocked by Play Protect"</em> because it is not distributed via Google Play Store.</p>
-                <div class="step-tip">
-                    Tap <strong>More details</strong> &rarr; <strong>Install anyway</strong>. Pay Tracker does not even include an <code>INTERNET</code> permission in its AndroidManifest.
-                </div>
-            </div>
-
-            <div class="guide-step">
-                <div class="step-num">Step 2</div>
-                <h4>Allow Restricted Settings (Android 13+)</h4>
-                <p>Android 13+ automatically disables notification listener access on sideloaded APKs and displays a <em>"Restricted setting"</em> prompt.</p>
-                <div class="step-tip">
-                    1. Go to <strong>Settings &rarr; Apps &rarr; Pay Tracker</strong><br>
-                    2. Tap the <strong>three dots (&vellip;)</strong> in top-right corner<br>
-                    3. Tap <strong>Allow restricted settings</strong> &amp; verify PIN<br>
-                    4. Return to Pay Tracker and tap Grant Access.
-                </div>
-            </div>
-
-            <div class="guide-step">
-                <div class="step-num">Step 3</div>
-                <h4>Interactive App Walkthrough &amp; Scan</h4>
-                <p>On opening Pay Tracker, an interactive spotlight guide will highlight and explain every core dashboard feature step-by-step.</p>
-                <div class="step-tip">
-                    Tap <strong>Scan All History</strong> to automatically populate all past and present expenses with a live progress dialog.
-                </div>
-            </div>
-        </div>
-    </div>
 </section>
 
+    <!-- A calm, factual setup guide -->
+    <section class="setup-guide" aria-labelledby="setup-guide-title">
+        <div class="setup-guide-head">
+            <div>
+                <div class="eyebrow">A few things to know</div>
+                <h3 id="setup-guide-title">Set up with confidence.</h3>
+            </div>
+            <p class="setup-guide-intro">Pay Tracker can use payment notifications and, when you choose, historical SMS to help identify transactions. You decide which permissions to grant and which suggestions to keep.</p>
+        </div>
+        <div class="setup-steps">
+            <article class="setup-step">
+                <div class="setup-number" aria-hidden="true">01</div>
+                <div>
+                    <h4>Verify the APK before installing</h4>
+                    <p>Download only from the release source you trust. If Play Protect flags Pay Tracker as harmful or blocks installation, stop and review the warning. Don’t assume a warning is harmless simply because the app is sideloaded.</p>
+                </div>
+                <span class="setup-label">Before installing</span>
+            </article>
+            <article class="setup-step">
+                <div class="setup-number" aria-hidden="true">02</div>
+                <div>
+                    <h4>Choose whether to enable notification access</h4>
+                    <p>Notification access helps detect supported payments as they arrive. Android may show an “Allow restricted settings” option for sideloaded apps; only enable access if you trust the app and want this feature. Settings labels vary by device.</p>
+                </div>
+                <span class="setup-label">Optional permission</span>
+            </article>
+            <article class="setup-step">
+                <div class="setup-number" aria-hidden="true">03</div>
+                <div>
+                    <h4>Import message history when you’re ready</h4>
+                    <p>SMS access is needed only for the historical message import flow. Choose all history or the selected month, then review imported suggestions and correct anything that looks wrong.</p>
+                </div>
+                <span class="setup-label">Optional import</span>
+            </article>
+        </div>
+    </section>
+    
 <!-- FAQ Section -->
 <section class="faq" id="faq">
     <div class="eyebrow">A few useful answers</div>
     <h2>Before you get started.</h2>
     <div class="faqgrid">
         <details>
-            <summary>Why does Google Play Protect show "Blocked by Play Protect"?</summary>
-            <p>Because Pay Tracker is distributed directly as an open-source APK rather than through Google Play Store. Google Play Protect flags any direct APK download. You can safely tap <strong>More details &rarr; Install anyway</strong>. Pay Tracker does not include any internet permission in its code, making cloud data leakage impossible.</p>
+            <summary>Why does Google Play Protect show a warning?</summary>
+            <p>Play Protect can warn about apps it doesn’t recognise or that it considers potentially harmful. A direct APK download is not, by itself, proof that an app is safe or harmful. If Pay Tracker is blocked, don’t bypass the warning automatically. Verify that the APK came from the intended release, check its signature and permissions, and stop if the warning identifies it as harmful.</p>
         </details>
         <details>
             <summary>Why is Notification Access marked as "Restricted setting" on Android 13+?</summary>

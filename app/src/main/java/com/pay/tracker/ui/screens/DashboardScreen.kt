@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -63,18 +64,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -88,6 +95,12 @@ import com.pay.tracker.core.model.TransactionDirection
 import com.pay.tracker.core.model.TransactionClassification
 import com.pay.tracker.core.sms.SmsImportResult
 import com.pay.tracker.ui.components.AppWalkthroughSpotlightOverlay
+import com.pay.tracker.ui.components.TOUR_BUDGET
+import com.pay.tracker.ui.components.TOUR_CASH_FLOW
+import com.pay.tracker.ui.components.TOUR_CATEGORIES
+import com.pay.tracker.ui.components.TOUR_MONTH
+import com.pay.tracker.ui.components.TOUR_REVIEW
+import com.pay.tracker.ui.components.TOUR_SCAN
 import com.pay.tracker.ui.components.BotanicalCreamButton
 import com.pay.tracker.ui.components.BotanicalGlassButton
 import com.pay.tracker.ui.components.BotanicalGlassCard
@@ -145,6 +158,27 @@ fun DashboardScreen(
     val cashFlowMetrics by viewModel.cashFlowMetrics.collectAsState()
     val peakExpense by viewModel.peakExpense.collectAsState()
 
+    val dashboardListState = rememberLazyListState()
+    var walkthroughStep by remember { mutableIntStateOf(0) }
+    val tourTargets = remember { mutableStateMapOf<Int, Rect>() }
+    val hasAnnualSpend = yearlySpendSummaries.isNotEmpty()
+    val walkthroughTargetItem = when (walkthroughStep) {
+        TOUR_REVIEW -> 1
+        TOUR_MONTH -> 2
+        TOUR_CASH_FLOW -> 3
+        TOUR_SCAN -> if (hasAnnualSpend) 5 else 4
+        TOUR_BUDGET -> if (hasAnnualSpend) 6 else 5
+        else -> if (hasAnnualSpend) 8 else 7
+    }
+
+    LaunchedEffect(showWalkthrough, walkthroughStep, walkthroughTargetItem) {
+        if (showWalkthrough) {
+            // Remove the previous position until the new target has been laid out.
+            tourTargets.remove(walkthroughStep)
+            dashboardListState.animateScrollToItem(walkthroughTargetItem)
+        }
+    }
+
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var showEditBudgetDialog by remember { mutableStateOf(false) }
     var showScanOptionDialog by remember { mutableStateOf(false) }
@@ -174,6 +208,7 @@ fun DashboardScreen(
             containerColor = Color.Transparent
         ) { innerPadding ->
         LazyColumn(
+            state = dashboardListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -186,35 +221,53 @@ fun DashboardScreen(
 
             // 1. Botanical Header Top Bar
             item {
-                DashboardHeaderRow(
-                    pendingCount = pendingCount,
-                    onBellClick = onNavigateToReview
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_REVIEW] = it.boundsInRoot() }
+                ) {
+                    DashboardHeaderRow(
+                        pendingCount = pendingCount,
+                        onBellClick = onNavigateToReview
+                    )
+                }
             }
 
             // 2. Month Selector Navigation Bar
             item {
-                DashboardMonthSelector(
-                    selectedMonth = selectedYearMonth,
-                    onPreviousMonth = { viewModel.previousMonth() },
-                    onNextMonth = { viewModel.nextMonth() },
-                    onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() }
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_MONTH] = it.boundsInRoot() }
+                ) {
+                    DashboardMonthSelector(
+                        selectedMonth = selectedYearMonth,
+                        onPreviousMonth = { viewModel.previousMonth() },
+                        onNextMonth = { viewModel.nextMonth() },
+                        onJumpToCurrentMonth = { viewModel.jumpToCurrentMonth() }
+                    )
+                }
             }
 
             // 3. Hero Spending Card with Velocity Bar Chart
             item {
-                HeroSpendingVelocityCard(
-                    total = monthlyTotal,
-                    dailyAverage = monthDailyAverage,
-                    currentDay = budgetPacing.currentDayOfMonth,
-                    totalDays = budgetPacing.totalDaysInMonth,
-                    dailySpends = monthDailySpendHistory,
-                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
-                    previousMonthTotal = previousMonthTotal,
-                    incomeReceived = cashFlowMetrics.incomeReceived,
-                    netCashFlow = cashFlowMetrics.netCashFlow
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_CASH_FLOW] = it.boundsInRoot() }
+                ) {
+                    HeroSpendingVelocityCard(
+                        total = monthlyTotal,
+                        dailyAverage = monthDailyAverage,
+                        currentDay = budgetPacing.currentDayOfMonth,
+                        totalDays = budgetPacing.totalDaysInMonth,
+                        dailySpends = monthDailySpendHistory,
+                        isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                        previousMonthTotal = previousMonthTotal,
+                        incomeReceived = cashFlowMetrics.incomeReceived,
+                        netCashFlow = cashFlowMetrics.netCashFlow
+                    )
+                }
             }
 
             // 3b. Quick Monthly Spend by Year Overview Banner
@@ -229,24 +282,36 @@ fun DashboardScreen(
 
             // 4. Action Buttons: Cream Pill "+ Add Expense" & Frosted Glass "Scan SMS"
             item {
-                ActionButtonsRow(
-                    onAddExpenseClick = { showAddExpenseSheet = true },
-                    onScanSmsClick = onScanSmsClick,
-                    isImporting = isImporting
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_SCAN] = it.boundsInRoot() }
+                ) {
+                    ActionButtonsRow(
+                        onAddExpenseClick = { showAddExpenseSheet = true },
+                        onScanSmsClick = onScanSmsClick,
+                        isImporting = isImporting
+                    )
+                }
             }
 
             // 5. Monthly Budget Fuel Gauge Card
             item {
-                BotanicalBudgetCard(
-                    pacing = budgetPacing,
-                    isCurrentMonth = selectedYearMonth.isCurrentMonth,
-                    onEditBudgetClick = {
-                        if (selectedYearMonth.isCurrentMonth) {
-                            showEditBudgetDialog = true
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_BUDGET] = it.boundsInRoot() }
+                ) {
+                    BotanicalBudgetCard(
+                        pacing = budgetPacing,
+                        isCurrentMonth = selectedYearMonth.isCurrentMonth,
+                        onEditBudgetClick = {
+                            if (selectedYearMonth.isCurrentMonth) {
+                                showEditBudgetDialog = true
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
 
             // 6. 3-Stat Metric Cards Row: Transactions, Top Category, Peak Expense
@@ -261,11 +326,17 @@ fun DashboardScreen(
 
             // 7. Category Allocation Card with Donut Chart and Legend
             item {
-                BotanicalCategoryAllocationCard(
-                    categoryBreakdown = categoryBreakdown,
-                    totalSpend = monthlyTotal,
-                    onViewAllClick = onNavigateToHistory
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { tourTargets[TOUR_CATEGORIES] = it.boundsInRoot() }
+                ) {
+                    BotanicalCategoryAllocationCard(
+                        categoryBreakdown = categoryBreakdown,
+                        totalSpend = monthlyTotal,
+                        onViewAllClick = onNavigateToHistory
+                    )
+                }
             }
 
             item {
@@ -332,7 +403,16 @@ fun DashboardScreen(
 
     if (showWalkthrough) {
         AppWalkthroughSpotlightOverlay(
-            onDismiss = { viewModel.dismissWalkthrough() }
+            stepIndex = walkthroughStep,
+            targetBounds = tourTargets[walkthroughStep],
+            onStepChange = { nextStep ->
+                walkthroughStep = nextStep
+                tourTargets.remove(nextStep)
+            },
+            onDismiss = {
+                walkthroughStep = 0
+                viewModel.dismissWalkthrough()
+            }
         )
     }
     }

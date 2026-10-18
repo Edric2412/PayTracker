@@ -575,39 +575,49 @@ button{font:inherit}
     border-radius:20px;
 }
 
-/* Floating Sound Bar on the Video */
+/* Sleek Frosted Glass Audio Toggle Button */
 .sound-toggle-bar{
     position:absolute;
-    bottom:18px;
-    left:50%;
-    transform:translateX(-50%);
+    top:16px;
+    right:16px;
     z-index:10;
-    background:rgba(8, 22, 14, 0.85);
-    border:1px solid rgba(46, 232, 154, 0.4);
-    padding:10px 18px;
+    background:rgba(8, 20, 14, 0.78);
+    border:1px solid rgba(255, 255, 255, 0.16);
+    padding:8px 14px;
     border-radius:999px;
     backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
     display:flex;
     align-items:center;
-    gap:10px;
-    box-shadow:0 8px 24px rgba(0,0,0,0.6);
+    gap:7px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.45);
     cursor:pointer;
-    transition:all 0.25s ease;
+    transition:all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    color:#FFFFFF;
+    font-family:inherit;
 }
 .sound-toggle-bar:hover{
-    background:rgba(12, 34, 22, 0.95);
-    border-color:var(--emerald);
-    transform:translateX(-50%) translateY(-2px);
+    background:rgba(12, 30, 20, 0.92);
+    border-color:rgba(46, 232, 154, 0.4);
+    transform:translateY(-1px);
+    box-shadow:0 8px 24px rgba(0,0,0,0.6);
 }
-.sound-icon{
-    font-size:16px;
-    line-height:1;
+.sound-toggle-bar:active{
+    transform:scale(0.97);
+}
+.sound-icon-svg{
+    width:15px;
+    height:15px;
+    display:grid;
+    place-items:center;
+    color:var(--emerald);
+    flex-shrink:0;
 }
 .sound-label{
-    font-size:12px;
-    font-weight:700;
-    color:#FFFFFF;
-    white-space:nowrap;
+    font-size:11.5px;
+    font-weight:600;
+    color:#EDE8DE;
+    letter-spacing:0.1px;
     line-height:1;
 }
 
@@ -1043,10 +1053,20 @@ button{font:inherit}
         <div class="video-cinema-box">
             <div class="video-inner">
                 <video id="appLaunchVideo" src="assets/launch-video.mp4" autoplay loop muted playsinline controls></video>
-                <div id="soundToggleBtn" class="sound-toggle-bar" title="Toggle audio">
-                    <span class="sound-icon" id="soundIcon">&#128263;</span>
-                    <span class="sound-label" id="soundLabel">Tap to Unmute (With Sound)</span>
-                </div>
+                <button id="soundToggleBtn" class="sound-toggle-bar" aria-label="Toggle audio" type="button">
+                    <span class="sound-icon-svg" id="soundIconWrap">
+                        <svg id="svgMuted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <line x1="23" y1="9" x2="17" y2="15"></line>
+                            <line x1="17" y1="9" x2="23" y2="15"></line>
+                        </svg>
+                        <svg id="svgUnmuted" style="display:none;" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                    </span>
+                    <span class="sound-label" id="soundLabel">Sound</span>
+                </button>
             </div>
         </div>
     </div>
@@ -1211,33 +1231,39 @@ document.querySelectorAll('.download-trigger').forEach(el => {
 // 3. Video Audio Controller with Sound
 const video = document.getElementById('appLaunchVideo');
 const soundBtn = document.getElementById('soundToggleBtn');
-const soundIcon = document.getElementById('soundIcon');
+const svgMuted = document.getElementById('svgMuted');
+const svgUnmuted = document.getElementById('svgUnmuted');
 const soundLabel = document.getElementById('soundLabel');
 
-soundBtn.addEventListener('click', () => {
-    if (video.muted) {
-        video.muted = false;
-        video.volume = 1.0;
-        video.play();
-        soundIcon.textContent = '🔊';
-        soundLabel.textContent = 'Sound On (Playing)';
+function updateAudioUI(isMuted) {
+    if (!svgMuted || !svgUnmuted || !soundLabel) return;
+    if (isMuted) {
+        svgMuted.style.display = 'block';
+        svgUnmuted.style.display = 'none';
+        soundLabel.textContent = 'Muted';
     } else {
-        video.muted = true;
-        soundIcon.textContent = '🔇';
-        soundLabel.textContent = 'Tap for Sound';
-    }
-});
-
-// Ensure video plays smoothly
-video.addEventListener('volumechange', () => {
-    if (video.muted) {
-        soundIcon.textContent = '🔇';
-        soundLabel.textContent = 'Tap for Sound';
-    } else {
-        soundIcon.textContent = '🔊';
+        svgMuted.style.display = 'none';
+        svgUnmuted.style.display = 'block';
         soundLabel.textContent = 'Sound On';
     }
-});
+}
+
+if (soundBtn && video) {
+    soundBtn.addEventListener('click', () => {
+        if (video.muted) {
+            video.muted = false;
+            video.volume = 1.0;
+            video.play();
+        } else {
+            video.muted = true;
+        }
+        updateAudioUI(video.muted);
+    });
+
+    video.addEventListener('volumechange', () => {
+        updateAudioUI(video.muted || video.volume === 0);
+    });
+}
 </script>
 </body>
 </html>

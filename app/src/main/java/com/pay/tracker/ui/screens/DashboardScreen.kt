@@ -1700,6 +1700,7 @@ private fun AnnualSpendBreakdownBanner(
 /**
  * Scan SMS Options Dialog
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScanSmsOptionsDialog(
     selectedMonthName: String,
@@ -1707,110 +1708,189 @@ private fun ScanSmsOptionsDialog(
     onScanThisMonth: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xF0101D16),
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = null,
-                    tint = BotanicalEmerald,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Scan SMS Transactions",
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 18.sp
-                )
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "Extract completed debit transactions from your bank and UPI SMS alerts.",
-                    fontSize = 13.sp,
-                    color = BotanicalTextSecondary
-                )
-
-                // Option 1: Scan All History (Recommended)
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color(0xFF0E1B14),
+        contentColor = Color(0xFFF1EEE5),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .size(width = 38.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF51614B))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
                 Surface(
-                    onClick = onScanAllHistory,
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0x33104F32),
-                    border = BorderStroke(1.5.dp, BotanicalEmerald),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF23382A),
+                    border = BorderStroke(1.dp, Color(0xFF465A40)),
+                    modifier = Modifier.size(50.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Scan All Historical SMS",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Surface(
-                                shape = CircleShape,
-                                color = BotanicalEmerald
-                            ) {
-                                Text(
-                                    text = "Recommended",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF0A150F),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Scans all previous transactions across all months and years. Automatically calculates money spent for each month in each year.",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 16.sp
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            tint = Color(0xFFD2DDBD),
+                            modifier = Modifier.size(23.dp)
                         )
                     }
                 }
-
-                // Option 2: Current Month Only
-                Surface(
-                    onClick = onScanThisMonth,
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0x33253B2F),
-                    border = BorderStroke(1.dp, Color(0x26FFFFFF)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Scan This Month Only",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Only scans SMS received in $selectedMonthName.",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 16.sp
-                        )
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Import transactions",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFF1EEE5)
+                    )
+                    Text(
+                        text = "Choose how much message history to check.",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = Color(0xFFB6C1B3)
+                    )
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = BotanicalTextSecondary)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color(0xFF283A2C))
+            )
+
+            SmsScanChoice(
+                number = "01",
+                title = "Scan all history",
+                description = "Look through older messages too, so past transactions can appear in their original months.",
+                detail = "Best for first setup",
+                onClick = onScanAllHistory
+            )
+
+            SmsScanChoice(
+                number = "02",
+                title = "Scan this month",
+                description = "Check messages dated within $selectedMonthName. A quicker option for refreshing the current view.",
+                detail = "Current month only",
+                onClick = onScanThisMonth
+            )
+
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF15261B),
+                border = BorderStroke(1.dp, Color(0xFF2C4030))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = Color(0xFFB9C89B),
+                        modifier = Modifier
+                            .padding(top = 1.dp)
+                            .size(17.dp)
+                    )
+                    Text(
+                        text = "Only recognised message patterns are imported. Review suggested entries afterwards, and grant SMS access only if you're comfortable.",
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = Color(0xFFB6C1B3)
+                    )
+                }
+            }
+
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Not now", color = Color(0xFFD7DECF), fontWeight = FontWeight.Medium)
             }
         }
-    )
+    }
+}
+
+@Composable
+private fun SmsScanChoice(
+    number: String,
+    title: String,
+    description: String,
+    detail: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFF17281D),
+        border = BorderStroke(1.dp, Color(0xFF3D503B)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF263C2B),
+                modifier = Modifier.size(43.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = number,
+                        color = Color(0xFFD2DDBD),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFF1EEE5)
+                )
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = Color(0xFFB6C1B3)
+                )
+                Text(
+                    text = detail,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFB9C89B)
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Select $title",
+                tint = Color(0xFFB9C89B),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
 }
 
 /**

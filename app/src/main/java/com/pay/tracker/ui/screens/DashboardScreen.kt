@@ -282,17 +282,12 @@ fun DashboardScreen(
 
             // 4. Action Buttons: Cream Pill "+ Add Expense" & Frosted Glass "Scan SMS"
             item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onGloballyPositioned { tourTargets[TOUR_SCAN] = it.boundsInRoot() }
-                ) {
-                    ActionButtonsRow(
-                        onAddExpenseClick = { showAddExpenseSheet = true },
-                        onScanSmsClick = onScanSmsClick,
-                        isImporting = isImporting
-                    )
-                }
+                ActionButtonsRow(
+                    onAddExpenseClick = { showAddExpenseSheet = true },
+                    onScanSmsClick = onScanSmsClick,
+                    isImporting = isImporting,
+                    onScanTargetMeasured = { tourTargets[TOUR_SCAN] = it }
+                )
             }
 
             // 5. Monthly Budget Fuel Gauge Card
@@ -798,7 +793,8 @@ private fun HeroSpendingVelocityCard(
 private fun ActionButtonsRow(
     onAddExpenseClick: () -> Unit,
     onScanSmsClick: () -> Unit,
-    isImporting: Boolean
+    isImporting: Boolean,
+    onScanTargetMeasured: (Rect) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -815,7 +811,9 @@ private fun ActionButtonsRow(
             onClick = onScanSmsClick,
             icon = Icons.Default.Download,
             enabled = !isImporting,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .onGloballyPositioned { onScanTargetMeasured(it.boundsInRoot()) }
         )
     }
 }

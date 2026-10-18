@@ -1,0 +1,12 @@
+{
+  "name": "paytracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pay Tracker Web Landing Page",
+  "scripts": {
+    "build": "echo 'Assets ready in ./web'"
+  },
+  "devDependencies": {
+    "wrangler": "^3.100.0"
+  }
+}

@@ -7,6 +7,11 @@
 <meta name="description" content="Your everyday spending, organised automatically. 100% offline personal finance and expense tracker for Android.">
 <link rel="icon" type="image/png" href="assets/app-icon.png">
 
+<!-- Google Fonts: Editorial Serif + Clean Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
 <!-- Lenis Smooth Scrolling -->
 <script src="https://unpkg.com/lenis@1.1.20/dist/lenis.min.js"></script>
 
@@ -18,18 +23,22 @@
     --leaf: #aab88b;
     --olive: #566348;
     --cream: #f1eee5;
+    --cream-hover: #faf7f0;
     --muted: #bdc6b7;
     --ink: #10251c;
     --line: rgba(219,228,207,.17);
     --glass: rgba(235,242,224,.07);
-    --emerald-glow: rgba(78, 186, 116, 0.22);
+    --emerald: #2EE89A;
+    --emerald-glow: rgba(46, 232, 154, 0.28);
+    --amber: #FFB74D;
+    --red: #FF7B7B;
 }
 *{box-sizing:border-box}
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 body{
     margin:0;
-    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-family:'Plus Jakarta Sans',Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
     background:var(--forest);
     color:var(--cream);
     overflow-x:hidden;
@@ -60,7 +69,7 @@ button{font:inherit}
     padding:15px 24px;
     background:var(--cream);
     color:#14271c;
-    font-weight:650;
+    font-weight:700;
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -74,67 +83,212 @@ button{font:inherit}
 .btn.small{padding:12px 18px;font-size:13px}
 
 /* Hero Section */
-.hero{min-height:640px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:42px;padding:60px 0 70px;position:relative}
-.eyebrow{font-size:11px;letter-spacing:2.3px;text-transform:uppercase;color:var(--leaf);font-weight:650}
-.hero h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:clamp(48px,6vw,78px);line-height:.98;letter-spacing:-3.5px;margin:22px 0}
+.hero{min-height:660px;display:grid;grid-template-columns:1.05fr 0.95fr;align-items:center;gap:50px;padding:60px 0 70px;position:relative}
+.eyebrow{font-size:11px;letter-spacing:2.3px;text-transform:uppercase;color:var(--leaf);font-weight:700}
+.hero h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:clamp(48px,5.8vw,78px);line-height:.98;letter-spacing:-3px;margin:22px 0}
 .hero h1 em{font-weight:400;color:var(--leaf);font-style:italic}
 .lede{font-size:16px;line-height:1.8;color:#c9d1c5;max-width:465px}
 .cta-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:30px}
-.hero-art{height:520px;position:relative;display:flex;align-items:center;justify-content:center}
-.glow{position:absolute;width:400px;height:400px;border-radius:50%;background:#78935d1c;filter:blur(38px)}
+.hero-art{height:540px;position:relative;display:flex;align-items:center;justify-content:center}
+.glow{position:absolute;width:400px;height:400px;border-radius:50%;background:#78935d25;filter:blur(40px)}
 .leafshape{position:absolute;color:#6e8752;opacity:.5;font-size:170px;filter:blur(.4px);transform:rotate(-28deg);right:-10px;top:35px}
 .leafshape.two{font-size:120px;left:3px;bottom:25px;transform:rotate(35deg);opacity:.32}
+
+/* Real Phone Frame Matching the Android App */
 .phone{
     position:relative;
-    width:285px;
-    height:535px;
-    border:2px solid #718070;
-    border-radius:42px;
+    width:300px;
+    height:560px;
+    border:2.5px solid #5a705e;
+    border-radius:44px;
     padding:10px;
-    background:linear-gradient(135deg,#27362d,#030906 28%,#13241a 75%,#52604a);
+    background:linear-gradient(135deg,#1f3025,#040b07 28%,#0e1d14 75%,#3a4a3b);
     box-shadow:0 35px 90px #0009,inset 0 0 0 2px #020604;
-    transform:rotate(5deg);
+    transform:rotate(4deg);
     z-index:1;
     transition:transform 0.4s ease;
 }
 .phone:hover{transform:rotate(0deg) scale(1.02)}
-.screen{height:100%;border-radius:31px;background:linear-gradient(160deg,#0d241a,#07150f);padding:22px 15px;overflow:hidden;border:1px solid #ffffff12}
-.notch{height:17px;width:92px;background:#020805;border-radius:0 0 14px 14px;position:absolute;top:10px;left:calc(50% - 46px)}
-.status{display:flex;justify-content:space-between;font-size:9px;color:#c6d1c0;margin-bottom:24px}
-.apphead{display:flex;justify-content:space-between;align-items:center;font-family:Georgia,serif;font-size:14px;margin-bottom:18px}
-.month{background:#ffffff09;padding:11px;border-radius:12px;font-size:10px;color:#d0d9c9;margin-bottom:10px}
-.metric{background:linear-gradient(135deg,#213b2b,#12291d);border:1px solid #a5bb8b24;padding:16px 14px;border-radius:18px;margin-bottom:9px}
-.tiny{font-size:10px;color:#bdc8b7}
-.amount{font-size:27px;margin-top:5px;letter-spacing:-.8px}
-.minigrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.minigrid .metric{padding:12px 10px}
-.miniamount{font-size:14px;margin-top:5px}
-.chart{height:88px;display:flex;align-items:end;gap:13px;padding:8px 12px 0;border-bottom:1px solid #ffffff18;margin:5px 0 16px}
-.bar{flex:1;background:linear-gradient(#b5c991,#526f48);border-radius:5px 5px 0 0;opacity:.85}
-.transactions{display:grid;gap:12px}
-.trans{display:flex;align-items:center;gap:9px;font-size:10px}
-.bubble{width:28px;height:28px;display:grid;place-items:center;border-radius:10px;background:#36543a;color:#d9e5c6}
-.trans .meta{flex:1}
-.trans small{display:block;color:#8f9e8a;font-size:9px;margin-top:3px}
-.trans strong{font-size:10px;font-weight:550}
-.trans .value{font-size:10px}
+.screen{
+    height:100%;
+    border-radius:34px;
+    background:linear-gradient(170deg,#0a1f16 0%,#05100a 60%,#07140e 100%);
+    padding:16px 14px 10px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.08);
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+}
+.notch{height:16px;width:84px;background:#030805;border-radius:0 0 12px 12px;position:absolute;top:10px;left:calc(50% - 42px);z-index:10}
+
+/* Header inside Phone */
+.app-header-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    padding-top:6px;
+}
+.app-header-title{font-size:15px;font-weight:700;color:#FFF;letter-spacing:-0.3px}
+.app-header-sub{font-size:9px;color:#8ba393}
+.bell-btn{
+    width:30px;
+    height:30px;
+    border-radius:50%;
+    background:rgba(37,59,47,0.5);
+    border:1px solid rgba(78,186,116,0.3);
+    display:grid;
+    place-items:center;
+    position:relative;
+    color:var(--emerald);
+    font-size:11px;
+}
+.bell-dot{
+    position:absolute;
+    top:2px;
+    right:2px;
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:var(--amber);
+}
+
+/* Month Bar */
+.month-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px;
+    padding:5px 8px;
+    font-size:10px;
+    color:#d0d9c9;
+    margin-bottom:8px;
+}
+.this-month-pill{
+    background:#EDE8DE;
+    color:#0A1B11;
+    font-size:8px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:8px;
+}
+
+/* Main KPI Card matching DashboardScreen.kt */
+.real-kpi-card{
+    background:linear-gradient(145deg,rgba(20,44,31,0.95),rgba(10,24,17,0.95));
+    border:1px solid rgba(78,186,116,0.3);
+    border-radius:18px;
+    padding:12px 14px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    margin-bottom:8px;
+}
+.kpi-top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+}
+.kpi-label{font-size:10px;color:#94ad9d;font-weight:500}
+.kpi-total{
+    font-size:24px;
+    font-weight:700;
+    letter-spacing:-0.8px;
+    color:#FFFFFF;
+    margin:2px 0 4px;
+}
+.kpi-sub{
+    font-size:9px;
+    color:var(--emerald);
+    line-height:1.4;
+}
+.kpi-sub.net{
+    color:#86d5ff;
+}
+.trend-badge{
+    font-size:8.5px;
+    background:rgba(46,232,154,0.12);
+    border:1px solid rgba(46,232,154,0.3);
+    color:var(--emerald);
+    padding:3px 7px;
+    border-radius:12px;
+    font-weight:600;
+}
+
+/* 3 Mini KPI Sub-cards (matching DashboardScreen refactor) */
+.sub-kpis-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:5px;
+    margin-bottom:8px;
+}
+.sub-kpi-box{
+    background:rgba(255,255,255,0.035);
+    border:1px solid rgba(255,255,255,0.05);
+    border-radius:10px;
+    padding:6px 6px;
+    text-align:center;
+}
+.sub-kpi-val{font-size:11px;font-weight:700;color:#FFF}
+.sub-kpi-label{font-size:7.5px;color:#859e8f;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Review Prompt Banner */
+.review-prompt{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:rgba(255,183,77,0.12);
+    border:1px solid rgba(255,183,77,0.25);
+    border-radius:10px;
+    padding:6px 9px;
+    font-size:8.5px;
+    color:#FFE082;
+    margin-bottom:6px;
+}
+
+/* Bottom Nav Bar matching PayBottomNavigationBar */
+.phone-bottom-nav{
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    padding-top:6px;
+    border-top:1px solid rgba(255,255,255,0.08);
+}
+.nav-tab-item{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    font-size:7.5px;
+    color:#738c7d;
+}
+.nav-tab-item.active{
+    color:var(--emerald);
+    font-weight:700;
+}
+.nav-tab-icon{
+    font-size:11px;
+}
+
+/* Floating monthly cash flow card */
 .floating{
     position:absolute;
     z-index:2;
-    bottom:55px;
-    left:-5px;
+    bottom:40px;
+    left:-10px;
     width:190px;
-    padding:17px;
+    padding:15px;
     border:1px solid #b8c9a53a;
     border-radius:18px;
-    background:rgba(16,43,29,.88);
+    background:rgba(16,43,29,.9);
     backdrop-filter:blur(16px);
-    box-shadow:0 20px 45px #0005;
+    box-shadow:0 20px 45px #0007;
     transform:rotate(-4deg);
 }
-.float-title{font-size:10px;color:#a9b99a}
-.float-value{font-family:Georgia,serif;font-size:25px;margin:8px 0}
-.float-sub{font-size:10px;color:#bac8b2}
+.float-title{font-size:9px;color:#a9b99a;text-transform:uppercase;letter-spacing:0.5px}
+.float-value{font-family:Georgia,serif;font-size:22px;margin:6px 0;color:#86d5ff}
+.float-sub{font-size:9.5px;color:#bac8b2}
 
 /* Section: Features */
 .section{padding:95px 0}
@@ -149,48 +303,120 @@ button{font:inherit}
 .feature h3{font-size:15px;font-weight:600;margin:0 0 10px}
 .feature p{font-size:12px;line-height:1.7;color:#b8c4b4;margin:0}
 
-/* Video Showcase Section */
-.video-showcase-section{
-    padding:80px 0 100px;
+/* FULL-SCREEN DEDICATED VIDEO SHOWCASE SECTION */
+.full-video-section{
+    padding:110px 0 120px;
+    background:radial-gradient(circle at 50% 50%, rgba(20, 52, 35, 0.45) 0%, rgba(7, 28, 22, 0.95) 70%, var(--forest) 100%);
     position:relative;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
 }
-.video-showcase-wrap{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
+.full-video-section::before{
+    content:'';
+    position:absolute;
+    top:25%;
+    left:50%;
+    transform:translate(-50%, -50%);
+    width:500px;
+    height:500px;
+    background:radial-gradient(circle, rgba(46, 232, 154, 0.18) 0%, transparent 65%);
+    filter:blur(60px);
+    pointer-events:none;
+}
+.video-header{
     text-align:center;
+    max-width:680px;
+    margin:0 auto 45px;
 }
-.video-phone-frame{
-    position:relative;
-    width:min(320px, 90vw);
-    border:3px solid #718070;
-    border-radius:44px;
-    padding:10px;
-    background:linear-gradient(140deg, #18281f, #030a06 40%, #102117);
-    box-shadow:0 30px 80px rgba(0,0,0,0.85), 0 0 45px rgba(78, 186, 116, 0.2);
-    margin-top:36px;
-    overflow:hidden;
+.video-header h2{
+    font-family:Georgia,serif;
+    font-size:clamp(36px,4.5vw,54px);
+    font-weight:400;
+    margin:14px 0 16px;
+    letter-spacing:-1px;
 }
-.video-phone-frame video{
-    width:100%;
-    height:auto;
-    border-radius:32px;
-    display:block;
-    background:#040e08;
+.video-header p{
+    color:#b9c5b7;
+    font-size:16px;
+    line-height:1.7;
 }
 
-/* Section: Screenshots / Showcase */
+/* Master Video Chassis Frame */
+.video-cinema-box{
+    position:relative;
+    max-width:340px;
+    margin:0 auto;
+    border-radius:48px;
+    padding:12px;
+    background:linear-gradient(145deg, #243d2c, #040d07 35%, #132418 80%, #465a48);
+    border:3px solid #6c826e;
+    box-shadow:
+        0 40px 100px rgba(0,0,0,0.9),
+        0 0 50px rgba(46, 232, 154, 0.25),
+        inset 0 0 0 2px #020604;
+}
+.video-inner{
+    position:relative;
+    border-radius:36px;
+    overflow:hidden;
+    background:#030805;
+    line-height:0;
+}
+.video-inner video{
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:36px;
+}
+
+/* Floating Sound Bar on the Video */
+.sound-toggle-bar{
+    position:absolute;
+    bottom:18px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:10;
+    background:rgba(8, 22, 14, 0.85);
+    border:1px solid rgba(46, 232, 154, 0.4);
+    padding:10px 18px;
+    border-radius:999px;
+    backdrop-filter:blur(16px);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.6);
+    cursor:pointer;
+    transition:all 0.25s ease;
+}
+.sound-toggle-bar:hover{
+    background:rgba(12, 34, 22, 0.95);
+    border-color:var(--emerald);
+    transform:translateX(-50%) translateY(-2px);
+}
+.sound-icon{
+    font-size:16px;
+    line-height:1;
+}
+.sound-label{
+    font-size:12px;
+    font-weight:700;
+    color:#FFFFFF;
+    white-space:nowrap;
+    line-height:1;
+}
+
+/* Showcase Section */
 .showcase{background:var(--cream);color:var(--ink);padding:90px 0}
 .showgrid{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:85px}
 .phone-stack{height:450px;position:relative;display:flex;align-items:center;justify-content:center}
 .mini-phone{position:absolute;width:190px;height:355px;border:2px solid #536154;border-radius:30px;background:#071b13;padding:8px;box-shadow:0 22px 45px #17291c35}
-.mini-phone .screen{border-radius:22px;padding:20px 10px}
+.mini-phone .screen{border-radius:22px;padding:16px 10px}
 .mini-phone.left{left:5%;transform:rotate(-9deg) scale(.9);opacity:.92}
 .mini-phone.right{right:1%;transform:rotate(8deg) scale(.88);opacity:.9}
 .mini-phone.center{z-index:2;transform:translateY(-4px);width:215px;height:405px}
-.mini-phone h4{font-family:Georgia,serif;font-size:18px;font-weight:400;margin:10px 0 16px}
-.rowline{padding:12px 8px;border-radius:11px;background:#ffffff0a;margin-bottom:8px;color:#eef2e7;font-size:10px}
-.rowline small{display:block;color:#a9b7a3;margin-top:5px}
+.mini-phone h4{font-family:Georgia,serif;font-size:18px;font-weight:400;margin:6px 0 12px;color:#FFF}
+.rowline{padding:10px 8px;border-radius:10px;background:#ffffff0a;margin-bottom:6px;color:#eef2e7;font-size:9.5px}
+.rowline small{display:block;color:#a9b7a3;margin-top:4px}
 .showcopy .eyebrow{color:#63734c}
 .showcopy h2{color:#12271b}
 .showcopy p{color:#526252;font-size:15px;line-height:1.8}
@@ -240,8 +466,8 @@ button{font:inherit}
 /* Responsive */
 @media(max-width:850px){
     .hero{grid-template-columns:1fr;gap:0;padding-top:55px}
-    .hero-art{height:500px;margin-top:-5px}
-    .phone{transform:rotate(3deg) scale(.9)}
+    .hero-art{height:520px;margin-top:10px}
+    .phone{transform:rotate(3deg) scale(.92)}
     .floating{left:3%;bottom:35px}
     .features{grid-template-columns:repeat(2,1fr)}
     .showgrid{grid-template-columns:1fr;gap:35px}
@@ -261,9 +487,9 @@ button{font:inherit}
     .hero h1{font-size:54px;letter-spacing:-2.8px}
     .lede{font-size:14px}
     .cta-row .btn{width:100%}
-    .hero-art{height:455px;margin-top:12px}
-    .phone{transform:rotate(3deg) scale(.8);transform-origin:center}
-    .floating{left:0;bottom:23px;transform:scale(.88) rotate(-4deg);transform-origin:left bottom}
+    .hero-art{height:470px;margin-top:12px}
+    .phone{transform:rotate(3deg) scale(.85);transform-origin:center}
+    .floating{left:0;bottom:20px;transform:scale(.85) rotate(-4deg);transform-origin:left bottom}
     .leafshape{font-size:120px}
     .section{padding:65px 0}
     .section h2{font-size:38px}
@@ -305,7 +531,7 @@ button{font:inherit}
     </a>
     <nav class="links">
         <a href="#features">Features</a>
-        <a href="#video">Demo</a>
+        <a href="#demo">Demo</a>
         <a href="#screenshots">Screenshots</a>
         <a href="#faq">FAQ</a>
     </nav>
@@ -331,66 +557,90 @@ button{font:inherit}
         </div>
     </div>
 
-    <!-- Hero Art Mockup -->
-    <div class="hero-art" aria-label="Illustrative Pay Tracker app dashboard preview">
+    <!-- Hero Art Mockup Matching Actual Pay Tracker App -->
+    <div class="hero-art" aria-label="Pay Tracker app dashboard preview">
         <div class="glow"></div>
         <div class="leafshape">&#x2767;</div>
         <div class="leafshape two">&#x2767;</div>
         <div class="phone">
             <div class="notch"></div>
             <div class="screen">
-                <div class="status"><span>9:41</span><span>&#x25AE;&#x25AE;&#x25AE;&#x3000;&#x25D6;</span></div>
-                <div class="apphead"><span>&#x2767; Pay Tracker</span><span>&sim;</span></div>
-                <div class="month">October overview&#x3000;&#x2304;</div>
-                <div class="metric">
-                    <div class="tiny">TOTAL SPENT</div>
-                    <div class="amount">&8377;18,420</div>
-                    <div class="tiny" style="margin-top:8px">A clear view of this month</div>
-                </div>
-                <div class="minigrid">
-                    <div class="metric">
-                        <div class="tiny">Received</div>
-                        <div class="miniamount">+&8377;32,000</div>
+                <!-- App Header Row Matching DashboardHeaderRow in Compose -->
+                <div class="app-header-row">
+                    <div>
+                        <div class="app-header-title">Pay Tracker</div>
+                        <div class="app-header-sub">Track smarter. Spend better.</div>
                     </div>
-                    <div class="metric">
-                        <div class="tiny">Net cash flow</div>
-                        <div class="miniamount">+&8377;13,580</div>
+                    <div class="bell-btn" title="Notifications">
+                        <span>🔔</span>
+                        <div class="bell-dot"></div>
                     </div>
                 </div>
-                <div class="tiny" style="margin-top:14px">MONTHLY SPENDING</div>
-                <div class="chart">
-                    <div class="bar" style="height:35%"></div>
-                    <div class="bar" style="height:58%"></div>
-                    <div class="bar" style="height:46%"></div>
-                    <div class="bar" style="height:82%"></div>
-                    <div class="bar" style="height:68%"></div>
-                    <div class="bar" style="height:95%"></div>
-                    <div class="bar" style="height:62%"></div>
+
+                <!-- Month Selector Matching DashboardMonthSelector in Compose -->
+                <div class="month-row">
+                    <div><span>&#x25C0;</span> <strong style="margin: 0 4px; color:#FFF;">October 2026</strong> <span>&#x25B6;</span></div>
+                    <div class="this-month-pill">This Month &hookleftarrow;</div>
                 </div>
-                <div class="tiny" style="margin-bottom:10px">RECENT TRANSACTIONS</div>
-                <div class="transactions">
-                    <div class="trans">
-                        <div class="bubble">&#x2302;</div>
-                        <div class="meta">Groceries<small>Food &amp; Dining</small></div>
-                        <strong class="value">&minus;&8377;420</strong>
+
+                <!-- Main Hero KPI Card Matching HeroSpendingVelocityCard in Compose -->
+                <div class="real-kpi-card">
+                    <div class="kpi-top-row">
+                        <div class="kpi-label">Total Spent</div>
+                        <div class="trend-badge">&darr; 12% vs last month</div>
                     </div>
-                    <div class="trans">
-                        <div class="bubble">&#x2197;</div>
-                        <div class="meta">Salary credited<small>Income</small></div>
-                        <strong class="value">+&8377;32,000</strong>
+                    <div class="kpi-total">&#x20B9;18,420<span style="font-size:14px;color:#98b3a1;font-weight:500">.00</span></div>
+                    <div class="kpi-sub">Received: +&#x20B9;32,000.00</div>
+                    <div class="kpi-sub net">Net Cash Flow: +&#x20B9;13,580.00</div>
+                </div>
+
+                <!-- 3 Sub-Cards Row Matching DashboardScreen.kt KPI additions -->
+                <div class="sub-kpis-grid">
+                    <div class="sub-kpi-box">
+                        <div class="sub-kpi-val">28</div>
+                        <div class="sub-kpi-label">Transactions</div>
                     </div>
-                    <div class="trans">
-                        <div class="bubble">&#x25C8;</div>
-                        <div class="meta">Travel<small>Transport</small></div>
-                        <strong class="value">&minus;&8377;280</strong>
+                    <div class="sub-kpi-box">
+                        <div class="sub-kpi-val" style="color:var(--amber)">Food</div>
+                        <div class="sub-kpi-label">Top Category</div>
+                    </div>
+                    <div class="sub-kpi-box">
+                        <div class="sub-kpi-val">&#x20B9;4,250</div>
+                        <div class="sub-kpi-label">Peak Spend</div>
+                    </div>
+                </div>
+
+                <!-- Review Prompt Banner Matching ReviewPromptCard in Compose -->
+                <div class="review-prompt">
+                    <span>⚡ <strong>3 transactions</strong> need review</span>
+                    <span style="color:#FFF;font-weight:700">Review &rarr;</span>
+                </div>
+
+                <!-- Bottom Navigation Bar Matching PayBottomNavigationBar in Compose -->
+                <div class="phone-bottom-nav">
+                    <div class="nav-tab-item active">
+                        <div class="nav-tab-icon">📊</div>
+                        <div>Dashboard</div>
+                    </div>
+                    <div class="nav-tab-item">
+                        <div class="nav-tab-icon">⚡</div>
+                        <div>Review</div>
+                    </div>
+                    <div class="nav-tab-item">
+                        <div class="nav-tab-icon">🕒</div>
+                        <div>History</div>
+                    </div>
+                    <div class="nav-tab-item">
+                        <div class="nav-tab-icon">⚙️</div>
+                        <div>Settings</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="floating">
             <div class="float-title">MONTHLY CASH FLOW</div>
-            <div class="float-value">+&8377;13,580</div>
-            <div class="float-sub">Income and spending, together.</div>
+            <div class="float-value">+&#x20B9;13,580</div>
+            <div class="float-sub">Income &amp; spending, together.</div>
         </div>
     </div>
 </section>
@@ -446,20 +696,28 @@ button{font:inherit}
     </div>
 </section>
 
-<!-- Live Launch Video Section -->
-<section class="video-showcase-section" id="video">
-    <div class="video-showcase-wrap">
-        <div class="eyebrow">&mdash; LIVE IN ACTION &mdash;</div>
-        <h2 style="font-family:Georgia,serif;font-size:clamp(32px,4vw,48px);font-weight:400;margin:12px 0 16px;">See Pay Tracker at work.</h2>
-        <p style="color:#b9c5b7;font-size:15px;max-width:520px;line-height:1.7;">Real-time payment detection, fluid 120 FPS list virtualization, and botanical glass elegance in real motion.</p>
+</div>
 
-        <div class="video-phone-frame">
-            <video src="assets/launch-video.mp4" autoplay loop muted playsinline></video>
+<!-- FULL DEDICATED CINEMA SECTION FOR LAUNCH VIDEO WITH SOUND -->
+<section class="full-video-section" id="demo">
+    <div class="wrap">
+        <div class="video-header">
+            <div class="eyebrow">&mdash; SEE PAY TRACKER IN ACTION &mdash;</div>
+            <h2>Built for motion. Tuned for clarity.</h2>
+            <p>Watch how Pay Tracker runs on Nothing Phone & Android with fluid 120 FPS list virtualization, real-time UPI transaction detection, and pure Botanical Glass elegance.</p>
+        </div>
+
+        <div class="video-cinema-box">
+            <div class="video-inner">
+                <video id="appLaunchVideo" src="assets/launch-video.mp4" autoplay loop muted playsinline controls></video>
+                <div id="soundToggleBtn" class="sound-toggle-bar" title="Toggle audio">
+                    <span class="sound-icon" id="soundIcon">&#128263;</span>
+                    <span class="sound-label" id="soundLabel">Tap to Unmute (With Sound)</span>
+                </div>
+            </div>
         </div>
     </div>
 </section>
-
-</div>
 
 <!-- Showcase / Screenshots -->
 <section class="showcase" id="screenshots">
@@ -471,8 +729,8 @@ button{font:inherit}
                     <h4>Overview</h4>
                     <div class="metric">
                         <div class="tiny">MONTHLY BUDGET</div>
-                        <div class="amount" style="font-size:21px">&8377;24,000</div>
-                        <div class="tiny">&8377;5,580 left</div>
+                        <div class="amount" style="font-size:21px">&#x20B9;24,000</div>
+                        <div class="tiny">&#x20B9;5,580 left</div>
                     </div>
                     <div class="tiny">BUDGET PACE</div>
                     <div class="chart">
@@ -481,8 +739,8 @@ button{font:inherit}
                         <div class="bar" style="height:55%"></div>
                         <div class="bar" style="height:85%"></div>
                     </div>
-                    <div class="rowline">Food &amp; Dining<small>&8377;4,250 spent</small></div>
-                    <div class="rowline">Transport<small>&8377;1,800 spent</small></div>
+                    <div class="rowline">Food &amp; Dining<small>&#x20B9;4,250 spent</small></div>
+                    <div class="rowline">Transport<small>&#x20B9;1,800 spent</small></div>
                 </div>
             </div>
             <div class="mini-phone right">
@@ -506,11 +764,11 @@ button{font:inherit}
                     <div class="status">9:41 <span>&#x25AE;&#x25AE;&#x25AE;</span></div>
                     <h4>History</h4>
                     <div class="month">All&#x3000; Expenses&#x3000; Income</div>
-                    <div class="rowline">Groceries <b style="float:right">&minus;&8377;420</b><small>Food &amp; Dining &middot; Today</small></div>
-                    <div class="rowline">Salary credited <b style="float:right;color:#b7d79d">+&8377;32,000</b><small>Income &middot; Today</small></div>
-                    <div class="rowline">Ride share <b style="float:right">&minus;&8377;280</b><small>Transport &middot; Yesterday</small></div>
-                    <div class="rowline">Cashback <b style="float:right;color:#b7d79d">+&8377;150</b><small>Refund &middot; Yesterday</small></div>
-                    <div class="rowline">Coffee <b style="float:right">&minus;&8377;180</b><small>Food &amp; Dining &middot; Yesterday</small></div>
+                    <div class="rowline">Groceries <b style="float:right">&minus;&#x20B9;420</b><small>Food &amp; Dining &middot; Google Pay &middot; Today</small></div>
+                    <div class="rowline">Salary credited <b style="float:right;color:#b7d79d">+&#x20B9;32,000</b><small>Income &middot; HDFC Bank &middot; Today</small></div>
+                    <div class="rowline">Ride share <b style="float:right">&minus;&#x20B9;280</b><small>Transport &middot; PhonePe &middot; Yesterday</small></div>
+                    <div class="rowline">Cashback <b style="float:right;color:#b7d79d">+&#x20B9;150</b><small>Refund &middot; Paytm &middot; Yesterday</small></div>
+                    <div class="rowline">Coffee <b style="float:right">&minus;&#x20B9;180</b><small>Food &amp; Dining &middot; Yesterday</small></div>
                 </div>
             </div>
         </div>
@@ -615,6 +873,37 @@ const APK_URL = "https://github.com/Edric2412/PayTracker/releases/download/v1.0.
 document.querySelectorAll('.download-trigger').forEach(el => {
     el.href = APK_URL;
     el.setAttribute('download', 'PayTracker-v1.0.apk');
+});
+
+// 3. Video Audio Controller with Sound
+const video = document.getElementById('appLaunchVideo');
+const soundBtn = document.getElementById('soundToggleBtn');
+const soundIcon = document.getElementById('soundIcon');
+const soundLabel = document.getElementById('soundLabel');
+
+soundBtn.addEventListener('click', () => {
+    if (video.muted) {
+        video.muted = false;
+        video.volume = 1.0;
+        video.play();
+        soundIcon.textContent = '🔊';
+        soundLabel.textContent = 'Sound On (Playing)';
+    } else {
+        video.muted = true;
+        soundIcon.textContent = '🔇';
+        soundLabel.textContent = 'Tap for Sound';
+    }
+});
+
+// Ensure video plays smoothly
+video.addEventListener('volumechange', () => {
+    if (video.muted) {
+        soundIcon.textContent = '🔇';
+        soundLabel.textContent = 'Tap for Sound';
+    } else {
+        soundIcon.textContent = '🔊';
+        soundLabel.textContent = 'Sound On';
+    }
 });
 </script>
 </body>

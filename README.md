@@ -104,7 +104,7 @@ flowchart LR
     H -->|Duplicate| X
     H -->|New| I["Persist to SQLite Database"]
 
-    I --> J["Category Suggester\n(Rule Engine / ML heuristic)"]
+    I --> J["Category Suggester\n(Local Keyword & Merchant Rule Engine)"]
     J --> K["Post Heads-Up Notification\nwith Quick Category Pills"]
     K --> L["Reactive UI Update\n(Kotlin Flow 120 FPS)"]
 ```

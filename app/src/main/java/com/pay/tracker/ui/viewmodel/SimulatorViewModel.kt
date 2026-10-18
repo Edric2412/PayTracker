@@ -160,14 +160,7 @@ class SimulatorViewModel(
 
         viewModelScope.launch {
             try {
-                var suggestedCategory = suggester.suggestCategory(parsed.merchant, body)
-                if (suggestedCategory == com.pay.tracker.core.model.Category.TRANSFER.name) {
-                    val geminiSuggester = com.pay.tracker.core.ai.GeminiCategorySuggester(context)
-                    val aiCategory = geminiSuggester.suggestCategoryWithGemini(parsed.merchant, body)
-                    if (aiCategory != null) {
-                        suggestedCategory = aiCategory
-                    }
-                }
+                val suggestedCategory = suggester.suggestCategory(parsed.merchant, body)
                 val isDuplicate = repository.isDuplicate(parsed.fingerprint, parsed.referenceId)
 
                 val idToUse: Long

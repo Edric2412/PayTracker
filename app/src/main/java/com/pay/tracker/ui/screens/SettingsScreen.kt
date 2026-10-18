@@ -96,13 +96,10 @@ fun SettingsScreen(
 
     val isNotificationAccessGranted by viewModel.isNotificationAccessGranted.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
-    val savedApiKey by viewModel.geminiApiKey.collectAsState()
     val importResult by viewModel.importState.collectAsState()
     val isImporting by viewModel.isImporting.collectAsState()
     val isResetDone by viewModel.isResetDone.collectAsState()
 
-    var apiKeyInput by remember(savedApiKey) { mutableStateOf(savedApiKey) }
-    var apiKeySavedNotification by remember { mutableStateOf(false) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -270,106 +267,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. AI & Categorization Section
-            item {
-                Text(
-                    text = "AI & Categorization",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = BotanicalTextSecondary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                )
-
-                BotanicalGlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            BotanicalSquircleContainer(
-                                icon = Icons.Default.Key,
-                                tint = Color(0xFFF0B429),
-                                backgroundColor = Color(0x26F0B429),
-                                size = 42.dp,
-                                iconSize = 20.dp
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Gemini AI Key (Optional)",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (savedApiKey.isNotBlank()) "AI Model Connected" else "Using Local Rule Engine",
-                                    fontSize = 12.sp,
-                                    color = if (savedApiKey.isNotBlank()) BotanicalEmerald else BotanicalTextSecondary
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "Add a free Google AI Studio key to intelligently auto-classify ambiguous merchants like obscure cafes and local vendors.",
-                            fontSize = 12.sp,
-                            color = BotanicalTextSecondary,
-                            lineHeight = 18.sp
-                        )
-
-                        OutlinedTextField(
-                            value = apiKeyInput,
-                            onValueChange = {
-                                apiKeyInput = it
-                                apiKeySavedNotification = false
-                            },
-                            label = { Text("Gemini API Key", color = BotanicalTextSecondary) },
-                            placeholder = { Text("YOUR_GEMINI_API_KEY", color = Color(0x66FFFFFF)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = BotanicalEmerald,
-                                unfocusedBorderColor = BotanicalGlassBorder
-                            )
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (savedApiKey.isNotBlank()) {
-                                BotanicalGlassButton(
-                                    text = "Clear Key",
-                                    onClick = {
-                                        viewModel.updateGeminiApiKey("")
-                                        apiKeyInput = ""
-                                        apiKeySavedNotification = false
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            BotanicalCreamButton(
-                                text = if (apiKeySavedNotification) "Saved!" else "Save Key",
-                                onClick = {
-                                    viewModel.updateGeminiApiKey(apiKeyInput)
-                                    apiKeySavedNotification = true
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 3. Data & Tools Section
+            // 2. Data & Tools Section
             item {
                 Text(
                     text = "Data & Tools",

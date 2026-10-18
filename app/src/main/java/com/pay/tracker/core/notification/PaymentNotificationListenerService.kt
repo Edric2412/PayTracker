@@ -148,24 +148,12 @@ class PaymentNotificationListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                // 2. Suggest category (Local heuristic first, with Gemini AI fallback)
-                var suggestedCategory = categorySuggester.suggestCategory(
+                // 2. Suggest category (100% on-device rule-based keyword matching)
+                val suggestedCategory = categorySuggester.suggestCategory(
                     merchant = parsed.merchant,
                     rawText = body,
                     classification = parsed.classification
                 )
-
-                // If local rules fall back to generic Transfer, query Gemini 3.5 Flash Lite
-                if (suggestedCategory == com.pay.tracker.core.model.Category.TRANSFER.name) {
-                    val geminiSuggester = com.pay.tracker.core.ai.GeminiCategorySuggester(applicationContext)
-                    val aiCategory = geminiSuggester.suggestCategoryWithGemini(
-                        merchant = parsed.merchant,
-                        description = body
-                    )
-                    if (aiCategory != null) {
-                        suggestedCategory = aiCategory
-                    }
-                }
 
                 // 3. Persist as PENDING in local Room database
                 val transaction = parsed.toTransaction(

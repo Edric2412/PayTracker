@@ -19,23 +19,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Load API key from Environment, .env, or local.properties (falling back to placeholder)
-        val properties = Properties()
-        val localPropsFile = project.rootProject.file("local.properties")
-        if (localPropsFile.exists()) {
-            localPropsFile.inputStream().use { properties.load(it) }
-        }
-        val envFile = project.rootProject.file(".env")
-        if (envFile.exists()) {
-            envFile.inputStream().use { properties.load(it) }
-        }
-
-        val envKey: String? = System.getenv("GEMINI_API_KEY")
-        val propKey: String? = properties.getProperty("GEMINI_API_KEY")
-        val geminiApiKey = envKey ?: propKey ?: "YOUR_GEMINI_API_KEY"
-
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
 
     buildTypes {

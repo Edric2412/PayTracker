@@ -24,17 +24,6 @@ class SettingsViewModel(
 
     private val prefs = context.getSharedPreferences("pay_tracker_prefs", Context.MODE_PRIVATE)
 
-    private val initialKey: String
-        get() {
-            val saved = prefs.getString("gemini_api_key", null)
-            if (!saved.isNullOrBlank()) return saved
-            val buildKey = BuildConfig.GEMINI_API_KEY.trim()
-            return if (buildKey.isNotBlank() && buildKey != "YOUR_GEMINI_API_KEY") buildKey else ""
-        }
-
-    private val _geminiApiKey = MutableStateFlow(initialKey)
-    val geminiApiKey: StateFlow<String> = _geminiApiKey.asStateFlow()
-
     private val _isNotificationAccessGranted = MutableStateFlow(checkNotificationAccess(context))
     val isNotificationAccessGranted: StateFlow<Boolean> = _isNotificationAccessGranted.asStateFlow()
 
@@ -49,11 +38,6 @@ class SettingsViewModel(
 
     private val _isResetDone = MutableStateFlow(false)
     val isResetDone: StateFlow<Boolean> = _isResetDone.asStateFlow()
-
-    fun updateGeminiApiKey(key: String) {
-        _geminiApiKey.value = key
-        prefs.edit().putString("gemini_api_key", key).apply()
-    }
 
     fun clearAllTransactions() {
         val repo = repository ?: return
